@@ -1,0 +1,21 @@
+[Unit]
+Description=AI Assistant Express Backend
+After=network.target llama-server.service
+Wants=llama-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ai-assistant/backend
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=LLM_BASE_URL=http://localhost:11434
+Environment=WHISPER_BIN=/usr/bin/whisper-cli
+Environment=WHISPER_MODEL=/opt/ai-assistant/models/ggml-tiny.en.bin
+Environment=PIPER_BIN=/usr/bin/piper
+Environment=PIPER_VOICE=/opt/ai-assistant/models/en_US-lessac-low.onnx
+
+[Install]
+WantedBy=multi-user.target

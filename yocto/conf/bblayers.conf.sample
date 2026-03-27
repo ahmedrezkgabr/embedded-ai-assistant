@@ -1,0 +1,11 @@
+BBLAYERS ?= " \
+  ${TOPDIR}/../poky/meta \
+  ${TOPDIR}/../poky/meta-poky \
+  ${TOPDIR}/../poky/meta-yocto-bsp \
+  ${TOPDIR}/../meta-openembedded/meta-oe \
+  ${TOPDIR}/../meta-openembedded/meta-python \
+  ${TOPDIR}/../meta-openembedded/meta-multimedia \
+  ${TOPDIR}/../meta-openembedded/meta-nodejs \
+  ${TOPDIR}/../meta-raspberrypi \
+  ${TOPDIR}/../meta-ai-assistant \
+"
