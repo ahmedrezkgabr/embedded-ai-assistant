@@ -1,0 +1,8 @@
+[
+  {
+    "id": "en_US-lessac-low",
+    "lang": "en",
+    "quality": "low",
+    "model": "/opt/ai-assistant/models/en_US-lessac-low.onnx"
+  }
+]
