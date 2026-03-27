@@ -1,0 +1,5 @@
+# whisper.cpp is intentionally NOT configured as a daemon service.
+#
+# The backend executes whisper-cli per request for strict resource control.
+# Keeping STT as an on-demand subprocess avoids idle memory usage on
+# low-RAM targets and simplifies crash recovery.
