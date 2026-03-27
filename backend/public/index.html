@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Assistant</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <h1>AI Assistant</h1>
+      <div class="status-row">
+        <span class="status-item"><span id="llm-dot" class="dot err"></span>LLM</span>
+        <span class="status-item"><span id="stt-dot" class="dot err"></span>STT</span>
+        <span class="status-item"><span id="tts-dot" class="dot err"></span>TTS</span>
+      </div>
+      <div class="top-controls">
+        <label>
+          Model
+          <select id="model-select"></select>
+        </label>
+        <label class="inline-toggle">
+          <input id="tts-toggle" type="checkbox" checked>
+          Speak responses
+        </label>
+      </div>
+    </header>
+
+    <section id="chat-window" class="chat-window"></section>
+
+    <section class="voice-bar">
+      <button id="mic-btn" class="mic-btn idle" type="button" aria-label="Record voice">🎤</button>
+      <canvas id="waveform" width="200" height="40"></canvas>
+      <span id="mic-status">Idle</span>
+    </section>
+
+    <section class="input-bar">
+      <textarea id="prompt-input" rows="3" placeholder="Type your message"></textarea>
+      <div class="input-actions">
+        <button id="send-btn" type="button">Send</button>
+        <button id="clear-btn" type="button">Clear</button>
+      </div>
+    </section>
+
+    <details class="settings-panel">
+      <summary>Settings</summary>
+      <div class="settings-grid">
+        <label>
+          Temperature
+          <input id="temperature" type="range" min="0.1" max="1.0" step="0.1" value="0.7">
+          <span id="temperature-value">0.7</span>
+        </label>
+        <label>
+          Max tokens
+          <input id="max-tokens" type="number" min="64" max="512" value="256">
+        </label>
+        <label>
+          Voice
+          <select id="voice-select">
+            <option value="en_US-lessac-low">en_US-lessac-low</option>
+          </select>
+        </label>
+        <label class="full-width">
+          System prompt
+          <textarea id="system-prompt" rows="3">You are a helpful assistant.</textarea>
+        </label>
+      </div>
+    </details>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
