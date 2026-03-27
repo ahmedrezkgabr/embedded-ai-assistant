@@ -31,21 +31,69 @@ async function stream(req, res, next) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    let buffer = '';
+    let clientClosed = false;
+
+    const writeSse = (payload) => {
+      if (!clientClosed) {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      }
+    };
 
     upstream.data.on('data', (chunk) => {
-      res.write(`data: ${chunk.toString()}\n\n`);
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) {
+          continue;
+        }
+
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') {
+          writeSse({ done: true });
+          res.end();
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(payload);
+          const token = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.text || '';
+          if (token) {
+            writeSse({ token, done: false });
+          }
+
+          if (parsed?.choices?.[0]?.finish_reason) {
+            writeSse({ done: true });
+            res.end();
+            return;
+          }
+        } catch {
+          writeSse({ token: payload, done: false });
+        }
+      }
     });
 
     upstream.data.on('end', () => {
-      res.write('data: {"done":true}\n\n');
-      res.end();
+      if (!clientClosed && !res.writableEnded) {
+        writeSse({ done: true });
+        res.end();
+      }
     });
 
     upstream.data.on('error', (error) => {
-      next(error);
+      if (!clientClosed) {
+        next(error);
+      }
     });
 
     req.on('close', () => {
+      clientClosed = true;
       upstream.data.destroy();
     });
 
