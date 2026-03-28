@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const runtime = require('../config/runtime');
 
-const piperBin = runtime.tts.piperBin;
+const piperBin = path.resolve(runtime.tts.piperBin);
 const defaultVoice = runtime.tts.defaultVoice;
 
 function resolveVoicePath(voiceName) {
@@ -24,8 +24,13 @@ async function synthesize(text, voiceName) {
     await fs.mkdir(path.dirname(runtime.tts.outputPrefix), { recursive: true });
   }
   const outputFile = `${runtime.tts.outputPrefix}_${Date.now()}.wav`;
-  const modelPath = resolveVoicePath(voiceName);
+  const modelPath = path.resolve(resolveVoicePath(voiceName));
   const piperDir = path.dirname(piperBin);
+  const espeakData = runtime.tts.espeakData ? path.resolve(runtime.tts.espeakData) : '';
+  const piperArgs = ['--model', modelPath, '--output_file', outputFile];
+  if (espeakData) {
+    piperArgs.push('--espeak_data', espeakData);
+  }
   const mergedLdLibraryPath = [
     piperDir,
     process.env.LD_LIBRARY_PATH || '',
@@ -35,7 +40,8 @@ async function synthesize(text, voiceName) {
 
   try {
     await new Promise((resolve, reject) => {
-      const child = spawn(piperBin, ['--model', modelPath, '--output_file', outputFile], {
+      const child = spawn(piperBin, piperArgs, {
+        cwd: piperDir,
         env: {
           ...process.env,
           LD_LIBRARY_PATH: mergedLdLibraryPath,

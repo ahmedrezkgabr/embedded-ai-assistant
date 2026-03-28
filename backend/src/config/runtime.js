@@ -42,6 +42,7 @@ module.exports = {
     piperBin: process.env.PIPER_BIN || '/usr/bin/piper',
     defaultVoice: process.env.PIPER_VOICE || '/usr/share/models/en_US-lessac-low.onnx',
     voiceDir: process.env.PIPER_VOICE_DIR || '/usr/share/models',
+    espeakData: process.env.PIPER_ESPEAK_DATA || '',
     timeoutMs: toNumber(process.env.PIPER_TIMEOUT, 20000),
     outputPrefix: path.join(tmpDir, 'ai-assistant', 'tts_out'),
   },
