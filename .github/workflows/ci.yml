@@ -164,6 +164,12 @@ jobs:
           PORT=3000
           LLM_BASE_URL=http://localhost:11434
           LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
+          LLM_TEMPERATURE=0
+          LLM_TOP_P=0.2
+          LLM_FREQUENCY_PENALTY=0
+          LLM_PRESENCE_PENALTY=0
+          LLM_MAX_TOKENS=64
+          LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Never output Chinese, Japanese, Korean, or other non-English scripts. Keep answers short and production-safe.
           WHISPER_BIN=../stt/whisper.cpp/build/bin/whisper-cli
           WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
           PIPER_BIN=../tts/bin/piper
@@ -220,9 +226,11 @@ jobs:
 
           RESP=$(curl -sf -X POST http://localhost:3000/api/llm/chat \
             -H "Content-Type: application/json" \
-            -d '{"prompt":"Reply with only the word PONG"}' \
+            -d '{"prompt":"Reply with only the word PONG","options":{"temperature":0,"top_p":0.1,"max_tokens":4,"frequency_penalty":0,"presence_penalty":0,"system_prompt":"Output exactly this uppercase ASCII token and nothing else: PONG"}}' \
             | python3 -c "import sys,json; print(json.load(sys.stdin).get('response',''))")
           [ -n "$RESP" ] || (echo "LLM chat returned empty response" && exit 1)
+          CLEAN_RESP=$(echo "$RESP" | tr -d '\r' | xargs)
+          [ "$CLEAN_RESP" = "PONG" ] || (echo "LLM chat returned unexpected response: $RESP" && exit 1)
           echo "LLM chat OK: $RESP"
 
           STT_OK=$(curl -sf http://localhost:3000/api/voice/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['stt']['ok'])")
@@ -297,6 +305,12 @@ jobs:
           PORT=3000
           LLM_BASE_URL=http://localhost:11434
           LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
+          LLM_TEMPERATURE=0
+          LLM_TOP_P=0.2
+          LLM_FREQUENCY_PENALTY=0
+          LLM_PRESENCE_PENALTY=0
+          LLM_MAX_TOKENS=128
+          LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Never output Chinese, Japanese, Korean, or other non-English scripts. Keep answers short and production-safe.
           WHISPER_BIN=../stt/whisper.cpp/build/bin/whisper-cli
           WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
           PIPER_BIN=../tts/bin/piper

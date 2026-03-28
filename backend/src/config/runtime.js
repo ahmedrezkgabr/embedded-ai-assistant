@@ -17,10 +17,10 @@ module.exports = {
     timeoutMs: toNumber(process.env.LLM_TIMEOUT, 60000),
     defaultModel: process.env.LLM_DEFAULT_MODEL || 'qwen2.5-0.5b-instruct-q4_k_m',
     maxTokens: toNumber(process.env.LLM_MAX_TOKENS, 512),
-    temperature: toNumber(process.env.LLM_TEMPERATURE, 0.2),
-    topP: toNumber(process.env.LLM_TOP_P, 0.9),
-    frequencyPenalty: toNumber(process.env.LLM_FREQUENCY_PENALTY, 0.6),
-    presencePenalty: toNumber(process.env.LLM_PRESENCE_PENALTY, 0.2),
+    temperature: toNumber(process.env.LLM_TEMPERATURE, 0.0),
+    topP: toNumber(process.env.LLM_TOP_P, 0.2),
+    frequencyPenalty: toNumber(process.env.LLM_FREQUENCY_PENALTY, 0.0),
+    presencePenalty: toNumber(process.env.LLM_PRESENCE_PENALTY, 0.0),
     logitBiasJson: process.env.LLM_LOGIT_BIAS_JSON || '',
     strictEnglishSystemPrompt:
       process.env.LLM_STRICT_SYSTEM_PROMPT ||
