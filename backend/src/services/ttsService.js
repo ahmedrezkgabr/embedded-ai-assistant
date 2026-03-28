@@ -31,6 +31,23 @@ async function synthesize(text, voiceName) {
       const child = spawn(piperBin, ['--model', modelPath, '--output_file', outputFile]);
       let stderr = '';
       let didTimeout = false;
+      let settled = false;
+
+      const rejectOnce = (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(error);
+      };
+
+      const resolveOnce = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve();
+      };
 
       const timer = setTimeout(() => {
         didTimeout = true;
@@ -43,22 +60,32 @@ async function synthesize(text, voiceName) {
 
       child.on('error', (error) => {
         clearTimeout(timer);
-        reject(error);
+        rejectOnce(error);
       });
 
       child.on('close', (code) => {
         clearTimeout(timer);
         if (didTimeout) {
-          return reject(new Error('piper timed out'));
+          return rejectOnce(new Error('piper timed out'));
         }
         if (code !== 0) {
-          return reject(new Error(`piper failed with code ${code}: ${stderr}`));
+          return rejectOnce(new Error(`piper failed with code ${code}: ${stderr}`));
         }
-        return resolve();
+        return resolveOnce();
       });
 
-      child.stdin.write(text);
-      child.stdin.end();
+      if (typeof child.stdin?.on === 'function') {
+        child.stdin.on('error', (error) => {
+          rejectOnce(new Error(`piper stdin error: ${error.message}${stderr ? ` | stderr: ${stderr}` : ''}`));
+        });
+      }
+
+      try {
+        child.stdin.write(text);
+        child.stdin.end();
+      } catch (error) {
+        rejectOnce(new Error(`piper stdin write failed: ${error.message}${stderr ? ` | stderr: ${stderr}` : ''}`));
+      }
     });
 
     return fs.readFile(outputFile);
