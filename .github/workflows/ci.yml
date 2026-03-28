@@ -224,14 +224,29 @@ jobs:
           STATUS=$(curl -sf http://localhost:3000/api/llm/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
           [ "$STATUS" = "ok" ] || (echo "LLM health FAILED: $STATUS" && exit 1)
 
-          RESP=$(curl -sf -X POST http://localhost:3000/api/llm/chat \
-            -H "Content-Type: application/json" \
-            -d '{"prompt":"Reply with only the word PONG","options":{"temperature":0,"top_p":0.1,"max_tokens":4,"frequency_penalty":0,"presence_penalty":0,"system_prompt":"Output exactly this uppercase ASCII token and nothing else: PONG"}}' \
-            | python3 -c "import sys,json; print(json.load(sys.stdin).get('response',''))")
-          [ -n "$RESP" ] || (echo "LLM chat returned empty response" && exit 1)
-          CLEAN_RESP=$(echo "$RESP" | tr -d '\r' | xargs)
-          [ "$CLEAN_RESP" = "PONG" ] || (echo "LLM chat returned unexpected response: $RESP" && exit 1)
-          echo "LLM chat OK: $RESP"
+          CHAT_OK=0
+          LAST_RESP=""
+          for attempt in $(seq 1 3); do
+            RESP=$(curl -sf -X POST http://localhost:3000/api/llm/chat \
+              -H "Content-Type: application/json" \
+              -d '{"prompt":"Reply with only the word PONG","options":{"temperature":0,"top_p":0.1,"max_tokens":4,"frequency_penalty":0,"presence_penalty":0,"system_prompt":"Output exactly this uppercase ASCII token and nothing else: PONG"}}' \
+              | python3 -c "import sys,json; print(json.load(sys.stdin).get('response',''))")
+            CLEAN_RESP=$(echo "$RESP" | tr -d '\r' | xargs)
+            LAST_RESP="$CLEAN_RESP"
+
+            if [ -n "$CLEAN_RESP" ] \
+              && echo "$CLEAN_RESP" | grep -Eq '^[ -~]+$' \
+              && echo "$CLEAN_RESP" | grep -Eq '(^|[^A-Za-z])PONG([^A-Za-z]|$)'; then
+              CHAT_OK=1
+              break
+            fi
+
+            echo "LLM chat probe attempt $attempt did not pass strict token check: '$CLEAN_RESP'"
+            sleep 1
+          done
+
+          [ "$CHAT_OK" = "1" ] || (echo "LLM chat returned unexpected response after retries: $LAST_RESP" && exit 1)
+          echo "LLM chat OK: $LAST_RESP"
 
           STT_OK=$(curl -sf http://localhost:3000/api/voice/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['stt']['ok'])")
           TTS_OK=$(curl -sf http://localhost:3000/api/voice/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['tts']['ok'])")
