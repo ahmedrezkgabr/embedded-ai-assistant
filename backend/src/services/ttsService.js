@@ -1,9 +1,11 @@
 const fs = require('fs/promises');
 const { constants } = require('fs');
 const { spawn } = require('child_process');
+const path = require('path');
+const runtime = require('../config/runtime');
 
-const piperBin = process.env.PIPER_BIN || '/usr/local/bin/piper';
-const defaultVoice = process.env.PIPER_VOICE || '/opt/ai-assistant/models/en_US-lessac-low.onnx';
+const piperBin = runtime.tts.piperBin;
+const defaultVoice = runtime.tts.defaultVoice;
 
 function resolveVoicePath(voiceName) {
   if (!voiceName) {
@@ -14,11 +16,14 @@ function resolveVoicePath(voiceName) {
     return voiceName;
   }
 
-  return `/opt/ai-assistant/models/${voiceName}.onnx`;
+  return path.join(runtime.tts.voiceDir, `${voiceName}.onnx`);
 }
 
 async function synthesize(text, voiceName) {
-  const outputFile = `/tmp/tts_out_${Date.now()}.wav`;
+  if (typeof fs.mkdir === 'function') {
+    await fs.mkdir(path.dirname(runtime.tts.outputPrefix), { recursive: true });
+  }
+  const outputFile = `${runtime.tts.outputPrefix}_${Date.now()}.wav`;
   const modelPath = resolveVoicePath(voiceName);
 
   try {
@@ -30,7 +35,7 @@ async function synthesize(text, voiceName) {
       const timer = setTimeout(() => {
         didTimeout = true;
         child.kill('SIGKILL');
-      }, 20000);
+      }, runtime.tts.timeoutMs);
 
       child.stderr.on('data', (chunk) => {
         stderr += chunk.toString();

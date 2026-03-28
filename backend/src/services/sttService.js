@@ -1,9 +1,11 @@
 const fs = require('fs/promises');
 const { constants } = require('fs');
 const { spawn } = require('child_process');
+const path = require('path');
+const runtime = require('../config/runtime');
 
-const whisperBin = process.env.WHISPER_BIN || '/usr/local/bin/whisper-cli';
-const whisperModel = process.env.WHISPER_MODEL || '/opt/ai-assistant/models/ggml-tiny.en.bin';
+const whisperBin = runtime.stt.whisperBin;
+const whisperModel = runtime.stt.whisperModel;
 
 function runWithTimeout(command, args, timeoutMs) {
   return new Promise((resolve, reject) => {
@@ -39,13 +41,16 @@ function runWithTimeout(command, args, timeoutMs) {
 }
 
 async function transcribe(wavFilePath) {
-  const outputBase = `/tmp/whisper_out_${Date.now()}`;
+  if (typeof fs.mkdir === 'function') {
+    await fs.mkdir(path.dirname(runtime.stt.outputPrefix), { recursive: true });
+  }
+  const outputBase = `${runtime.stt.outputPrefix}_${Date.now()}`;
 
   try {
     await runWithTimeout(
       whisperBin,
       ['-m', whisperModel, '-f', wavFilePath, '-otxt', '-of', outputBase],
-      30000
+      runtime.stt.timeoutMs
     );
 
     const outputText = await fs.readFile(`${outputBase}.txt`, 'utf8');

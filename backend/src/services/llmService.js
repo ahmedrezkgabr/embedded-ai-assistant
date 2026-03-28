@@ -1,8 +1,51 @@
 const axios = require('axios');
+const runtime = require('../config/runtime');
 
-const baseURL = process.env.LLM_BASE_URL || 'http://localhost:11434';
-const timeout = Number(process.env.LLM_TIMEOUT || 60000);
-const defaultModel = process.env.LLM_DEFAULT_MODEL || 'qwen2.5:0.5b';
+const baseURL = runtime.llm.baseUrl;
+const timeout = runtime.llm.timeoutMs;
+const defaultModel = runtime.llm.defaultModel;
+
+function parseLogitBias() {
+  if (!runtime.llm.logitBiasJson) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(runtime.llm.logitBiasJson);
+    return parsed && typeof parsed === 'object' ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildMessages(prompt, options = {}) {
+  const strictPrompt = runtime.llm.strictEnglishSystemPrompt;
+  const userSystemPrompt = String(options.system_prompt || '').trim();
+  const systemContent = userSystemPrompt
+    ? `${strictPrompt}\n\nAdditional instruction: ${userSystemPrompt}`
+    : strictPrompt;
+
+  return [
+    { role: 'system', content: systemContent },
+    { role: 'user', content: prompt },
+  ];
+}
+
+function buildPayload(prompt, model, options = {}, stream = false) {
+  const logitBias = parseLogitBias();
+
+  return {
+    model,
+    messages: buildMessages(prompt, options),
+    max_tokens: Number(options.max_tokens || runtime.llm.maxTokens),
+    temperature: Number(options.temperature ?? runtime.llm.temperature),
+    top_p: Number(options.top_p ?? runtime.llm.topP),
+    frequency_penalty: Number(options.frequency_penalty ?? runtime.llm.frequencyPenalty),
+    presence_penalty: Number(options.presence_penalty ?? runtime.llm.presencePenalty),
+    stream,
+    ...(logitBias ? { logit_bias: logitBias } : {}),
+  };
+}
 
 const client = axios.create({
   baseURL,
@@ -20,16 +63,13 @@ function createLlmUnavailableError(error) {
 }
 
 async function chat(prompt, model = defaultModel, options = {}) {
-  const payload = {
-    model,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: Number(options.max_tokens || 512),
-    temperature: Number(options.temperature || 0.7),
-    stream: false,
-  };
+  const payload = buildPayload(prompt, model, options, false);
 
   try {
-    const response = await client.post('/v1/chat/completions', payload);
+    const requestConfig = options.signal ? { signal: options.signal } : undefined;
+    const response = requestConfig
+      ? await client.post('/v1/chat/completions', payload, requestConfig)
+      : await client.post('/v1/chat/completions', payload);
     return {
       response: response.data?.choices?.[0]?.message?.content || '',
       model: response.data?.model || model,
@@ -40,16 +80,14 @@ async function chat(prompt, model = defaultModel, options = {}) {
 }
 
 async function streamChat(prompt, model = defaultModel, options = {}) {
-  const payload = {
-    model,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: Number(options.max_tokens || 512),
-    temperature: Number(options.temperature || 0.7),
-    stream: true,
-  };
+  const payload = buildPayload(prompt, model, options, true);
 
   try {
-    return await client.post('/v1/chat/completions', payload, { responseType: 'stream' });
+    const requestConfig = {
+      responseType: 'stream',
+      ...(options.signal ? { signal: options.signal } : {}),
+    };
+    return await client.post('/v1/chat/completions', payload, requestConfig);
   } catch (error) {
     throw createLlmUnavailableError(error);
   }

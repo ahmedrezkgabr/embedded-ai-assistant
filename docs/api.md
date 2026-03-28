@@ -40,19 +40,30 @@ curl -s -X POST http://localhost:3000/api/llm/chat \
 
 Request body: same as `/api/llm/chat`
 
+Optional fields:
+
+```json
+{
+  "tts_stream": true,
+  "voice": "en_US-lessac-low"
+}
+```
+
 Response: `text/event-stream`
 
 Events:
 
-- `data: {"token":"...","done":false}`
-- `data: {"done":true}`
+- `event: token` + `data: {"token":"...","done":false}`
+- `event: sentence` + `data: {"type":"sentence","sentence":"..."}`
+- `event: audio` + `data: {"type":"audio","sentence":"...","mime":"audio/wav","audio_base64":"..."}` (only when `tts_stream=true`)
+- `event: done` + `data: {"done":true}`
 
 Example:
 
 ```bash
 curl -N -X POST http://localhost:3000/api/llm/stream \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"stream hello"}'
+  -d '{"prompt":"stream hello", "tts_stream": true, "voice": "en_US-lessac-low"}'
 ```
 
 ### `GET /api/llm/health`
