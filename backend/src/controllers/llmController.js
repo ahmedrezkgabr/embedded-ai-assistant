@@ -1,6 +1,7 @@
 const llmService = require('../services/llmService');
 
 async function chat(req, res, next) {
+  const started = Date.now();
   try {
     const prompt = String(req.body?.prompt || '').trim();
     if (!prompt) {
@@ -8,10 +9,19 @@ async function chat(req, res, next) {
     }
 
     const model = req.body?.model;
-    const options = req.body?.options || {};
-    const response = await llmService.chat(prompt, model, options);
+    const options = {
+      ...(req.body?.options || {}),
+      ...(req.body?.temperature !== undefined ? { temperature: req.body.temperature } : {}),
+      ...(req.body?.max_tokens !== undefined ? { max_tokens: req.body.max_tokens } : {}),
+    };
+    const result = await llmService.chat(prompt, model, options);
 
-    return res.json({ response, requestId: req.requestId });
+    return res.json({
+      response: result.response,
+      model: result.model,
+      duration_ms: Date.now() - started,
+      requestId: req.requestId,
+    });
   } catch (error) {
     return next(error);
   }
@@ -25,8 +35,12 @@ async function stream(req, res, next) {
     }
 
     const model = req.body?.model;
-    const options = req.body?.options || {};
-    const upstream = await llmService.streamChat(prompt, model, options);
+    const options = {
+      ...(req.body?.options || {}),
+      ...(req.body?.temperature !== undefined ? { temperature: req.body.temperature } : {}),
+      ...(req.body?.max_tokens !== undefined ? { max_tokens: req.body.max_tokens } : {}),
+    };
+    const result = await llmService.chat(prompt, model, options);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -34,67 +48,52 @@ async function stream(req, res, next) {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
-    let buffer = '';
-    let clientClosed = false;
+    const chunks = String(result.response || '')
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
 
-    const writeSse = (payload) => {
-      if (!clientClosed) {
-        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    let index = 0;
+    let closed = false;
+
+    const sendDone = () => {
+      if (closed || res.writableEnded) {
+        return;
       }
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+      closed = true;
     };
 
-    upstream.data.on('data', (chunk) => {
-      buffer += chunk.toString();
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) {
-          continue;
-        }
-
-        const payload = trimmed.slice(5).trim();
-        if (payload === '[DONE]') {
-          writeSse({ done: true });
-          res.end();
-          return;
-        }
-
-        try {
-          const parsed = JSON.parse(payload);
-          const token = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.text || '';
-          if (token) {
-            writeSse({ token, done: false });
-          }
-
-          if (parsed?.choices?.[0]?.finish_reason) {
-            writeSse({ done: true });
-            res.end();
-            return;
-          }
-        } catch {
-          writeSse({ token: payload, done: false });
-        }
+    const timer = setInterval(() => {
+      if (closed || res.writableEnded) {
+        clearInterval(timer);
+        return;
       }
-    });
 
-    upstream.data.on('end', () => {
-      if (!clientClosed && !res.writableEnded) {
-        writeSse({ done: true });
-        res.end();
+      if (index >= chunks.length) {
+        clearInterval(timer);
+        sendDone();
+        return;
       }
-    });
 
-    upstream.data.on('error', (error) => {
-      if (!clientClosed) {
-        next(error);
-      }
-    });
+      const token = index === 0 ? chunks[index] : ` ${chunks[index]}`;
+      res.write(`data: ${JSON.stringify({ token, done: false })}\n\n`);
+      index += 1;
+    }, 25);
+
+    const forceDone = setTimeout(() => {
+      clearInterval(timer);
+      sendDone();
+    }, 25000);
 
     req.on('close', () => {
-      clientClosed = true;
-      upstream.data.destroy();
+      closed = true;
+      clearInterval(timer);
+      clearTimeout(forceDone);
+      if (!res.writableEnded) {
+        res.end();
+      }
     });
 
     return undefined;

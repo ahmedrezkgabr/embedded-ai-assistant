@@ -9,6 +9,16 @@ const client = axios.create({
   timeout,
 });
 
+function createLlmUnavailableError(error) {
+  const wrapped = new Error('LLM service unavailable');
+  if (error?.response?.status) {
+    wrapped.status = error.response.status;
+  } else {
+    wrapped.status = 503;
+  }
+  return wrapped;
+}
+
 async function chat(prompt, model = defaultModel, options = {}) {
   const payload = {
     model,
@@ -18,8 +28,15 @@ async function chat(prompt, model = defaultModel, options = {}) {
     stream: false,
   };
 
-  const response = await client.post('/v1/chat/completions', payload);
-  return response.data?.choices?.[0]?.message?.content || '';
+  try {
+    const response = await client.post('/v1/chat/completions', payload);
+    return {
+      response: response.data?.choices?.[0]?.message?.content || '',
+      model: response.data?.model || model,
+    };
+  } catch (error) {
+    throw createLlmUnavailableError(error);
+  }
 }
 
 async function streamChat(prompt, model = defaultModel, options = {}) {
@@ -31,17 +48,40 @@ async function streamChat(prompt, model = defaultModel, options = {}) {
     stream: true,
   };
 
-  return client.post('/v1/chat/completions', payload, { responseType: 'stream' });
+  try {
+    return await client.post('/v1/chat/completions', payload, { responseType: 'stream' });
+  } catch (error) {
+    throw createLlmUnavailableError(error);
+  }
 }
 
 async function ping() {
-  const response = await client.get('/health');
-  return { ok: true, ...response.data };
+  const started = Date.now();
+  try {
+    const response = await client.get('/health');
+    const status = response.data?.status || 'ok';
+    return {
+      ok: status === 'ok',
+      status,
+      latency_ms: Date.now() - started,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 'unreachable',
+      latency_ms: Date.now() - started,
+    };
+  }
 }
 
 async function listModels() {
-  const response = await client.get('/v1/models');
-  return response.data;
+  try {
+    const response = await client.get('/v1/models');
+    const models = Array.isArray(response.data?.data) ? response.data.data : [];
+    return { models };
+  } catch (error) {
+    throw createLlmUnavailableError(error);
+  }
 }
 
 module.exports = {
