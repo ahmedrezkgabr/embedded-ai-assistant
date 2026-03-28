@@ -263,15 +263,17 @@ jobs:
           [ "$CHAT_OK" = "1" ] || (echo "LLM chat failed after retries: '$LAST_RESP'" && exit 1)
           echo "LLM chat OK (ASCII English response): $LAST_RESP"
 
-          STT_OK=$(curl -sf http://localhost:3000/api/voice/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['stt']['ok'])")
-          TTS_OK=$(curl -sf http://localhost:3000/api/voice/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['tts']['ok'])")
+          VOICE_HEALTH_BODY=$(curl -sS http://localhost:3000/api/voice/health || true)
+          [ -n "$VOICE_HEALTH_BODY" ] || (echo "voice health request failed" && cat /tmp/backend.log && exit 1)
+          STT_OK=$(echo "$VOICE_HEALTH_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('stt',{}).get('ok'))")
+          TTS_OK=$(echo "$VOICE_HEALTH_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tts',{}).get('ok'))")
           [ "$STT_OK" = "True" ] || (echo "STT health FAILED" && exit 1)
           [ "$TTS_OK" = "True" ] || (echo "TTS health FAILED" && exit 1)
 
-          curl -sf -X POST http://localhost:3000/api/voice/tts \
+          TTS_CODE=$(curl -sS -o /tmp/ci_tts.wav -w "%{http_code}" -X POST http://localhost:3000/api/voice/tts \
             -H "Content-Type: application/json" \
-            -d '{"text":"Continuous integration test."}' \
-            --output /tmp/ci_tts.wav
+            -d '{"text":"Continuous integration test."}')
+          [ "$TTS_CODE" = "200" ] || (echo "TTS endpoint failed with HTTP $TTS_CODE" && cat /tmp/backend.log && exit 1)
           SIZE=$(wc -c < /tmp/ci_tts.wav)
           [ "$SIZE" -gt 5000 ] || (echo "TTS output too small: $SIZE bytes" && exit 1)
           echo "TTS OK: $SIZE bytes"
@@ -279,9 +281,11 @@ jobs:
           sudo apt-get install -y ffmpeg -q
           ffmpeg -f lavfi -i "sine=frequency=440:duration=2" \
             -ar 16000 -ac 1 -sample_fmt s16 /tmp/ci_stt.wav -y -loglevel quiet
-          TRANSCRIPT=$(curl -sf -X POST http://localhost:3000/api/voice/stt \
+          STT_RESP=$(curl -sS -o /tmp/ci_stt_resp.json -w "%{http_code}" -X POST http://localhost:3000/api/voice/stt \
             -F "audio=@/tmp/ci_stt.wav;type=audio/wav" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin).get('transcript',''))")
+            || true)
+          [ "$STT_RESP" = "200" ] || (echo "STT endpoint failed with HTTP $STT_RESP" && cat /tmp/ci_stt_resp.json && cat /tmp/backend.log && exit 1)
+          TRANSCRIPT=$(python3 -c "import json; print(json.load(open('/tmp/ci_stt_resp.json')).get('transcript',''))")
           echo "STT OK: transcript='$TRANSCRIPT'"
 
           for path in "/" "/style.css" "/app.js"; do
