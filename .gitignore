@@ -16,3 +16,4 @@ piper/
 *.wav
 *.mp3
 *.pcm
+tts/bin
