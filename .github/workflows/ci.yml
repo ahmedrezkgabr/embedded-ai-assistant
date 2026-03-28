@@ -158,7 +158,7 @@ jobs:
           cat > backend/.env << 'EOF'
           PORT=3000
           LLM_BASE_URL=http://localhost:11434
-          LLM_DEFAULT_MODEL=qwen2.5:0.5b
+          LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
           WHISPER_BIN=../stt/whisper.cpp/build/bin/whisper-cli
           WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
           PIPER_BIN=../tts/bin/piper
@@ -175,19 +175,36 @@ jobs:
             -c 2048 --threads 2 -ngl 0 \
             --chat-template qwen2 \
             > /tmp/llama.log 2>&1 &
+
+          READY=0
           echo "Waiting for llama-server..."
           for i in $(seq 1 24); do
             sleep 5
-            curl -sf http://localhost:11434/health && echo "Ready" && break
+            if curl -sf http://localhost:11434/health >/dev/null || curl -sf http://localhost:11434/v1/models >/dev/null; then
+              READY=1
+              echo "Ready"
+              break
+            fi
             echo "  still waiting ($((i*5))s)..."
           done
+
+          [ "$READY" = "1" ] || (echo "llama-server failed to become ready" && cat /tmp/llama.log && exit 1)
 
       - name: Install backend deps and start Express
         run: |
           cd backend && npm ci
           node src/server.js > /tmp/backend.log 2>&1 &
-          sleep 3
-          curl -sf http://localhost:3000/api/llm/health || (cat /tmp/backend.log && exit 1)
+
+          READY=0
+          for i in $(seq 1 20); do
+            sleep 2
+            STATUS=$(curl -sf http://localhost:3000/api/llm/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" || true)
+            if [ "$STATUS" = "ok" ]; then
+              READY=1
+              break
+            fi
+          done
+          [ "$READY" = "1" ] || (echo "Backend LLM health not ready" && cat /tmp/backend.log && cat /tmp/llama.log && exit 1)
 
       - name: API tests
         run: |
@@ -272,7 +289,7 @@ jobs:
           cat > backend/.env << 'EOF'
           PORT=3000
           LLM_BASE_URL=http://localhost:11434
-          LLM_DEFAULT_MODEL=qwen2.5:0.5b
+          LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
           WHISPER_BIN=../stt/whisper.cpp/build/bin/whisper-cli
           WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
           PIPER_BIN=../tts/bin/piper
@@ -284,9 +301,29 @@ jobs:
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
             --host 0.0.0.0 --port 11434 -c 2048 --threads 2 -ngl 0 \
             --chat-template qwen2 > /tmp/llama.log 2>&1 &
-          for i in $(seq 1 24); do sleep 5; curl -sf http://localhost:11434/health && break; done
+
+          READY=0
+          for i in $(seq 1 24); do
+            sleep 5
+            if curl -sf http://localhost:11434/health >/dev/null || curl -sf http://localhost:11434/v1/models >/dev/null; then
+              READY=1
+              break
+            fi
+          done
+          [ "$READY" = "1" ] || (echo "llama-server failed to become ready" && cat /tmp/llama.log && exit 1)
+
           cd backend && npm ci && node src/server.js > /tmp/backend.log 2>&1 &
-          sleep 3
+
+          READY=0
+          for i in $(seq 1 20); do
+            sleep 2
+            STATUS=$(curl -sf http://localhost:3000/api/llm/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" || true)
+            if [ "$STATUS" = "ok" ]; then
+              READY=1
+              break
+            fi
+          done
+          [ "$READY" = "1" ] || (echo "Backend LLM health not ready" && cat /tmp/backend.log && cat /tmp/llama.log && exit 1)
 
       - name: Full voice round-trip
         run: |
