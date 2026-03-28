@@ -46,7 +46,15 @@ describe('ttsService', () => {
     const result = await ttsService.synthesize('hello');
 
     expect(Buffer.isBuffer(result)).toBe(true);
-    expect(spawn).toHaveBeenCalledWith('/tmp/piper', expect.any(Array));
+    expect(spawn).toHaveBeenCalledWith(
+      '/tmp/piper',
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          LD_LIBRARY_PATH: expect.any(String),
+        }),
+      })
+    );
     expect(fs.readFile).toHaveBeenCalledWith(expect.stringMatching(/\.wav$/));
   });
 
