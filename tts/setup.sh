@@ -32,6 +32,13 @@ if [ "$BUILD_ONLY" = "--build-only" ]; then
   chmod +x "$BIN_DIR/piper"
   find "$PIPER_SRC_DIR/build" -type f -name '*.so*' -exec cp -n {} "$BIN_DIR"/ \;
 
+  ESPEAK_SO_PATH="$(ldd "$BIN_DIR/piper" | awk '/libespeak-ng\.so\.1/{print $3; exit}')"
+  if [ -n "${ESPEAK_SO_PATH:-}" ] && [ -f "$ESPEAK_SO_PATH" ]; then
+    ESPEAK_SO_REAL="$(readlink -f "$ESPEAK_SO_PATH")"
+    cp -n "$ESPEAK_SO_REAL" "$BIN_DIR/"
+    ln -sfn "$(basename "$ESPEAK_SO_REAL")" "$BIN_DIR/libespeak-ng.so.1"
+  fi
+
   echo "Build-only mode: skipping model download and audio test"
   exit 0
 fi

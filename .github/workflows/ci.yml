@@ -113,6 +113,8 @@ jobs:
     needs: [unit-test, build-llm, build-stt, build-tts]
     steps:
       - uses: actions/checkout@v4
+      - name: Install runtime deps
+        run: sudo apt-get update && sudo apt-get install -y libespeak-ng1 ffmpeg
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -131,7 +133,22 @@ jobs:
         with:
           name: piper
           path: tts/bin
-      - run: chmod +x llm/llama.cpp/build/bin/llama-server stt/whisper.cpp/build/bin/whisper-cli tts/bin/piper
+      - name: Prepare executable artifacts
+        run: |
+          chmod +x llm/llama.cpp/build/bin/llama-server stt/whisper.cpp/build/bin/whisper-cli tts/bin/piper
+          if [ ! -e tts/bin/libespeak-ng.so.1 ] && [ -e tts/bin/libespeak-ng.so ]; then
+            ln -s "$(basename "$(readlink -f tts/bin/libespeak-ng.so)")" tts/bin/libespeak-ng.so.1
+          fi
+          if [ ! -e tts/bin/libespeak-ng.so.1 ] && ls tts/bin/libespeak-ng.so.1.* >/dev/null 2>&1; then
+            ln -s "$(basename "$(ls tts/bin/libespeak-ng.so.1.* | head -n 1)")" tts/bin/libespeak-ng.so.1
+          fi
+          if [ ! -e tts/bin/libpiper_phonemize.so.1 ] && ls tts/bin/libpiper_phonemize.so.1.* >/dev/null 2>&1; then
+            ln -s "$(basename "$(ls tts/bin/libpiper_phonemize.so.1.* | head -n 1)")" tts/bin/libpiper_phonemize.so.1
+          fi
+
+      - name: Export runtime library paths
+        run: |
+          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Cache model files
         uses: actions/cache@v4
@@ -179,14 +196,24 @@ jobs:
           WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
           PIPER_BIN=../tts/bin/piper
           PIPER_VOICE=../tts/models/en_US-lessac-low.onnx
+          PIPER_ESPEAK_DATA=../tts/bin/espeak-ng-data
           NODE_ENV=test
           LLM_TIMEOUT=60000
           EOF
 
+      - name: Validate piper runtime
+        run: |
+          ls -la tts/bin
+          ldd tts/bin/piper
+          test -e tts/bin/libespeak-ng.so.1 || (echo "missing libespeak-ng.so.1 in tts/bin" && exit 1)
+          echo "ci tts runtime check" | tts/bin/piper \
+            --model tts/models/en_US-lessac-low.onnx \
+            --espeak_data tts/bin/espeak-ng-data \
+            --output_file /tmp/ci_piper_check.wav
+          test -s /tmp/ci_piper_check.wav
+
       - name: Start llama-server
         run: |
-          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}"
-
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
             --host 0.0.0.0 --port 11434 \
@@ -278,12 +305,11 @@ jobs:
           TTS_CODE=$(curl -sS -o /tmp/ci_tts.wav -w "%{http_code}" -X POST http://localhost:3000/api/voice/tts \
             -H "Content-Type: application/json" \
             -d '{"text":"Continuous integration test."}')
-          [ "$TTS_CODE" = "200" ] || (echo "TTS endpoint failed with HTTP $TTS_CODE" && cat /tmp/backend.log && exit 1)
+          [ "$TTS_CODE" = "200" ] || (echo "TTS endpoint failed with HTTP $TTS_CODE" && echo "=== tts response ===" && cat /tmp/ci_tts.wav && echo && cat /tmp/backend.log && exit 1)
           SIZE=$(wc -c < /tmp/ci_tts.wav)
           [ "$SIZE" -gt 5000 ] || (echo "TTS output too small: $SIZE bytes" && exit 1)
           echo "TTS OK: $SIZE bytes"
 
-          sudo apt-get install -y ffmpeg -q
           ffmpeg -f lavfi -i "sine=frequency=440:duration=2" \
             -ar 16000 -ac 1 -sample_fmt s16 /tmp/ci_stt.wav -y -loglevel quiet
           STT_RESP=$(curl -sS -o /tmp/ci_stt_resp.json -w "%{http_code}" -X POST http://localhost:3000/api/voice/stt \
@@ -310,6 +336,8 @@ jobs:
     needs: integration
     steps:
       - uses: actions/checkout@v4
+      - name: Install runtime deps
+        run: sudo apt-get update && sudo apt-get install -y libespeak-ng1 ffmpeg
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -327,7 +355,22 @@ jobs:
         with:
           name: piper
           path: tts/bin
-      - run: chmod +x llm/llama.cpp/build/bin/llama-server stt/whisper.cpp/build/bin/whisper-cli tts/bin/piper
+      - name: Prepare executable artifacts
+        run: |
+          chmod +x llm/llama.cpp/build/bin/llama-server stt/whisper.cpp/build/bin/whisper-cli tts/bin/piper
+          if [ ! -e tts/bin/libespeak-ng.so.1 ] && [ -e tts/bin/libespeak-ng.so ]; then
+            ln -s "$(basename "$(readlink -f tts/bin/libespeak-ng.so)")" tts/bin/libespeak-ng.so.1
+          fi
+          if [ ! -e tts/bin/libespeak-ng.so.1 ] && ls tts/bin/libespeak-ng.so.1.* >/dev/null 2>&1; then
+            ln -s "$(basename "$(ls tts/bin/libespeak-ng.so.1.* | head -n 1)")" tts/bin/libespeak-ng.so.1
+          fi
+          if [ ! -e tts/bin/libpiper_phonemize.so.1 ] && ls tts/bin/libpiper_phonemize.so.1.* >/dev/null 2>&1; then
+            ln -s "$(basename "$(ls tts/bin/libpiper_phonemize.so.1.* | head -n 1)")" tts/bin/libpiper_phonemize.so.1
+          fi
+
+      - name: Export runtime library paths
+        run: |
+          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Restore model cache
         uses: actions/cache@v4
@@ -354,10 +397,10 @@ jobs:
           WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
           PIPER_BIN=../tts/bin/piper
           PIPER_VOICE=../tts/models/en_US-lessac-low.onnx
+          PIPER_ESPEAK_DATA=../tts/bin/espeak-ng-data
           NODE_ENV=test
           LLM_TIMEOUT=60000
           EOF
-          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}"
 
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
@@ -389,8 +432,6 @@ jobs:
 
       - name: Full voice round-trip
         run: |
-          sudo apt-get install -y ffmpeg -q
-
           curl -sf -X POST http://localhost:3000/api/voice/tts \
             -H "Content-Type: application/json" \
             -d '{"text":"What is the largest planet in the solar system?"}' \

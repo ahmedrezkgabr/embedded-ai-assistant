@@ -2,7 +2,7 @@
 
 A complete, end-to-end, locally hosted AI assistant for embedded Linux. At runtime, every service runs on-device with no internet dependency.
 
-```
+```txt
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 1: Web UI (Vanilla HTML/CSS/JS)                     │
 │  - Chat view, mic capture, WAV encoder, local playback     │
@@ -79,4 +79,3 @@ A complete, end-to-end, locally hosted AI assistant for embedded Linux. At runti
 - `docs/api.md`
 - `docs/hardware.md`
 - `docs/voice-pipeline.md`
-
