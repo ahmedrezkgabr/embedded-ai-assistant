@@ -203,12 +203,14 @@ jobs:
 
       - name: Validate piper runtime
         run: |
+          ESPEAK_DATA_DIR="$PWD/tts/bin/espeak-ng-data"
           ls -la tts/bin
           ldd tts/bin/piper
           test -e tts/bin/libespeak-ng.so.1 || (echo "missing libespeak-ng.so.1 in tts/bin" && exit 1)
+          test -f "$ESPEAK_DATA_DIR/phontab" || (echo "missing espeak data phontab in $ESPEAK_DATA_DIR" && exit 1)
           echo "ci tts runtime check" | tts/bin/piper \
             --model tts/models/en_US-lessac-low.onnx \
-            --espeak_data tts/bin/espeak-ng-data \
+            --espeak_data "$ESPEAK_DATA_DIR" \
             --output_file /tmp/ci_piper_check.wav
           test -s /tmp/ci_piper_check.wav
 

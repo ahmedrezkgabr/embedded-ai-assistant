@@ -32,6 +32,13 @@ if [ "$BUILD_ONLY" = "--build-only" ]; then
   chmod +x "$BIN_DIR/piper"
   find "$PIPER_SRC_DIR/build" -type f -name '*.so*' -exec cp -n {} "$BIN_DIR"/ \;
 
+  ESPEAK_DATA_PHONTAB="$(find "$PIPER_SRC_DIR/build" -type f -path '*/espeak-ng-data/phontab' | head -n 1 || true)"
+  if [ -n "${ESPEAK_DATA_PHONTAB:-}" ] && [ -f "$ESPEAK_DATA_PHONTAB" ]; then
+    ESPEAK_DATA_DIR="$(dirname "$ESPEAK_DATA_PHONTAB")"
+    mkdir -p "$BIN_DIR/espeak-ng-data"
+    cp -a "$ESPEAK_DATA_DIR"/. "$BIN_DIR/espeak-ng-data"/
+  fi
+
   ESPEAK_SO_PATH="$(ldd "$BIN_DIR/piper" | awk '/libespeak-ng\.so\.1/{print $3; exit}')"
   if [ -n "${ESPEAK_SO_PATH:-}" ] && [ -f "$ESPEAK_SO_PATH" ]; then
     ESPEAK_SO_REAL="$(readlink -f "$ESPEAK_SO_PATH")"
