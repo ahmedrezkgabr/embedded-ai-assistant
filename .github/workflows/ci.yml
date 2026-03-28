@@ -52,7 +52,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: llama-server
-          path: llm/llama.cpp/build/bin/llama-server
+          path: |
+            llm/llama.cpp/build/bin/llama-server
+            llm/llama.cpp/build/bin/libllama.so*
+            llm/llama.cpp/build/bin/libmtmd.so*
 
   build-stt:
     runs-on: ubuntu-latest
@@ -169,6 +172,8 @@ jobs:
 
       - name: Start llama-server
         run: |
+          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:${LD_LIBRARY_PATH:-}"
+
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
             --host 0.0.0.0 --port 11434 \
@@ -297,6 +302,8 @@ jobs:
           NODE_ENV=test
           LLM_TIMEOUT=60000
           EOF
+          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:${LD_LIBRARY_PATH:-}"
+
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
             --host 0.0.0.0 --port 11434 -c 2048 --threads 2 -ngl 0 \
