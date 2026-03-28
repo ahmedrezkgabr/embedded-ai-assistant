@@ -4,6 +4,10 @@ const runtime = require('../config/runtime');
 const baseURL = runtime.llm.baseUrl;
 const timeout = runtime.llm.timeoutMs;
 const defaultModel = runtime.llm.defaultModel;
+const DEFAULT_SYSTEM_PROMPT =
+  process.env.LLM_STRICT_SYSTEM_PROMPT ||
+  process.env.LLM_SYSTEM_PROMPT ||
+  'You are a helpful assistant. Always reply in English. Be concise.';
 
 function parseLogitBias() {
   if (!runtime.llm.logitBiasJson) {
@@ -19,14 +23,13 @@ function parseLogitBias() {
 }
 
 function buildMessages(prompt, options = {}) {
-  const strictPrompt = runtime.llm.strictEnglishSystemPrompt;
-  const userSystemPrompt = String(options.system_prompt || '').trim();
-  const systemContent = userSystemPrompt
-    ? `${strictPrompt}\n\nAdditional instruction: ${userSystemPrompt}`
-    : strictPrompt;
+  const systemPrompt =
+    options.systemPrompt ||
+    options.system_prompt ||
+    DEFAULT_SYSTEM_PROMPT;
 
   return [
-    { role: 'system', content: systemContent },
+    { role: 'system', content: systemPrompt },
     { role: 'user', content: prompt },
   ];
 }
@@ -35,11 +38,13 @@ function buildPayload(prompt, model, options = {}, stream = false) {
   const logitBias = parseLogitBias();
 
   return {
-    model,
+    model: model || defaultModel,
     messages: buildMessages(prompt, options),
-    max_tokens: Number(options.max_tokens || runtime.llm.maxTokens),
-    temperature: Number(options.temperature ?? runtime.llm.temperature),
-    top_p: Number(options.top_p ?? runtime.llm.topP),
+    max_tokens: Number(options.max_tokens ?? 64),
+    temperature: Number(options.temperature ?? 0),
+    top_p: Number(options.top_p ?? 0.1),
+    repeat_penalty: Number(options.repeat_penalty ?? 1.1),
+    seed: Number(options.seed ?? 42),
     frequency_penalty: Number(options.frequency_penalty ?? runtime.llm.frequencyPenalty),
     presence_penalty: Number(options.presence_penalty ?? runtime.llm.presencePenalty),
     stream,

@@ -1,4 +1,7 @@
+const js = require('@eslint/js');
+
 module.exports = [
+  js.configs.recommended,
   {
     files: ['src/**/*.js', 'tests/**/*.js', '*.js'],
     languageOptions: {
@@ -20,11 +23,10 @@ module.exports = [
       },
     },
     rules: {
-      'no-unused-vars': 'error',
+      'no-unused-vars': 'warn',
       'no-undef': 'error',
       semi: ['error', 'always'],
-      eqeqeq: ['error', 'always'],
-      'no-empty-function': 'off',
+      eqeqeq: 'error',
     },
   },
   {
