@@ -67,6 +67,20 @@ function createLlmUnavailableError(error) {
   return wrapped;
 }
 
+function normalizeAsciiResponse(text) {
+  const raw = String(text || '');
+  const asciiOnly = raw
+    .replace(/[^\x20-\x7E\n\r\t]/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+  if (asciiOnly) {
+    return asciiOnly;
+  }
+
+  return 'I can only reply using English ASCII text.';
+}
+
 async function chat(prompt, model = defaultModel, options = {}) {
   const payload = buildPayload(prompt, model, options, false);
 
@@ -75,8 +89,10 @@ async function chat(prompt, model = defaultModel, options = {}) {
     const response = requestConfig
       ? await client.post('/v1/chat/completions', payload, requestConfig)
       : await client.post('/v1/chat/completions', payload);
+    const content = response.data?.choices?.[0]?.message?.content || '';
+
     return {
-      response: response.data?.choices?.[0]?.message?.content || '',
+      response: normalizeAsciiResponse(content),
       model: response.data?.model || model,
     };
   } catch (error) {
