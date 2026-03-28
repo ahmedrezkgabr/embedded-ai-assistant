@@ -17,7 +17,7 @@ function resolveVoicePath(voiceName) {
   return `/opt/ai-assistant/models/${voiceName}.onnx`;
 }
 
-async function synthesize(text, voiceName = 'en_US-lessac-low') {
+async function synthesize(text, voiceName) {
   const outputFile = `/tmp/tts_out_${Date.now()}.wav`;
   const modelPath = resolveVoicePath(voiceName);
 

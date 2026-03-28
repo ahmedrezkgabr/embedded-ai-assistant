@@ -46,7 +46,9 @@ async function stream(req, res, next) {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders?.();
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
 
     const chunks = String(result.response || '')
       .split(/\s+/)

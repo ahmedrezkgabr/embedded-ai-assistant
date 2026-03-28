@@ -5,8 +5,36 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$ROOT_DIR/bin"
 MODELS_DIR="$ROOT_DIR/models"
 PIPER_ARCHIVE="$BIN_DIR/piper.tar.gz"
+PIPER_SRC_DIR="$ROOT_DIR/piper-src"
+BUILD_ONLY="${1:-}"
 
 mkdir -p "$BIN_DIR" "$MODELS_DIR"
+
+if [ "$BUILD_ONLY" = "--build-only" ]; then
+  if [ ! -d "$PIPER_SRC_DIR" ]; then
+    git clone --depth 1 https://github.com/rhasspy/piper.git "$PIPER_SRC_DIR"
+  else
+    echo "piper source already present at $PIPER_SRC_DIR"
+  fi
+
+  git -C "$PIPER_SRC_DIR" submodule update --init --recursive
+
+  cmake -S "$PIPER_SRC_DIR" -B "$PIPER_SRC_DIR/build" -DCMAKE_BUILD_TYPE=Release
+  cmake --build "$PIPER_SRC_DIR/build" --config Release -j4
+
+  PIPER_PATH="$(find "$PIPER_SRC_DIR/build" -type f -name piper | head -n 1)"
+  if [ -z "$PIPER_PATH" ]; then
+    echo "Unable to locate built piper binary"
+    exit 1
+  fi
+
+  cp "$PIPER_PATH" "$BIN_DIR/piper"
+  chmod +x "$BIN_DIR/piper"
+  find "$PIPER_SRC_DIR/build" -type f -name '*.so*' -exec cp -n {} "$BIN_DIR"/ \;
+
+  echo "Build-only mode: skipping model download and audio test"
+  exit 0
+fi
 
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -33,7 +61,8 @@ if [ ! -x "$BIN_DIR/piper" ]; then
     echo "Unable to locate piper binary in archive"
     exit 1
   fi
-  cp "$PIPER_PATH" "$BIN_DIR/piper"
+  PIPER_DIST_DIR="$(dirname "$PIPER_PATH")"
+  cp -a "$PIPER_DIST_DIR"/. "$BIN_DIR"/
   chmod +x "$BIN_DIR/piper"
   rm -rf "$TMP_EXTRACT_DIR"
   rm -f "$PIPER_ARCHIVE"

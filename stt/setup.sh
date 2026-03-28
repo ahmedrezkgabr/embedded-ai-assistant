@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WHISPER_DIR="$ROOT_DIR/whisper.cpp"
 MODELS_DIR="$ROOT_DIR/models"
 MODEL_FILE="$MODELS_DIR/ggml-tiny.en.bin"
+BUILD_ONLY="${1:-}"
 
 mkdir -p "$MODELS_DIR"
 
@@ -16,6 +17,11 @@ fi
 
 cmake -S "$WHISPER_DIR" -B "$WHISPER_DIR/build"
 cmake --build "$WHISPER_DIR/build" -j4
+
+if [ "$BUILD_ONLY" = "--build-only" ]; then
+  echo "Build-only mode: skipping model download"
+  exit 0
+fi
 
 if [ ! -f "$MODEL_FILE" ]; then
   bash "$WHISPER_DIR/models/download-ggml-model.sh" tiny.en

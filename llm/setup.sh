@@ -6,6 +6,7 @@ LLAMA_DIR="$ROOT_DIR/llama.cpp"
 MODELS_DIR="$ROOT_DIR/models"
 MODEL_FILE="$MODELS_DIR/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf"
 MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+BUILD_ONLY="${1:-}"
 
 mkdir -p "$MODELS_DIR"
 
@@ -17,6 +18,11 @@ fi
 
 cmake -S "$LLAMA_DIR" -B "$LLAMA_DIR/build"
 cmake --build "$LLAMA_DIR/build" --config Release -j4
+
+if [ "$BUILD_ONLY" = "--build-only" ]; then
+  echo "Build-only mode: skipping model download and server start"
+  exit 0
+fi
 
 if [ ! -f "$MODEL_FILE" ]; then
   wget -O "$MODEL_FILE" "$MODEL_URL"
