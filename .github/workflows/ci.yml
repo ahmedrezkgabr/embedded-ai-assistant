@@ -101,7 +101,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: piper
-          path: tts/bin/piper
+          path: |
+            tts/bin/piper
+            tts/bin/piper_phonemize
+            tts/bin/espeak-ng
+            tts/bin/*.so*
+            tts/bin/espeak-ng-data/**
 
   integration:
     runs-on: ubuntu-latest
@@ -180,7 +185,7 @@ jobs:
 
       - name: Start llama-server
         run: |
-          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:${LD_LIBRARY_PATH:-}"
+          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}"
 
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
@@ -352,7 +357,7 @@ jobs:
           NODE_ENV=test
           LLM_TIMEOUT=60000
           EOF
-          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:${LD_LIBRARY_PATH:-}"
+          export LD_LIBRARY_PATH="$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}"
 
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \

@@ -25,10 +25,22 @@ async function synthesize(text, voiceName) {
   }
   const outputFile = `${runtime.tts.outputPrefix}_${Date.now()}.wav`;
   const modelPath = resolveVoicePath(voiceName);
+  const piperDir = path.dirname(piperBin);
+  const mergedLdLibraryPath = [
+    piperDir,
+    process.env.LD_LIBRARY_PATH || '',
+  ]
+    .filter(Boolean)
+    .join(':');
 
   try {
     await new Promise((resolve, reject) => {
-      const child = spawn(piperBin, ['--model', modelPath, '--output_file', outputFile]);
+      const child = spawn(piperBin, ['--model', modelPath, '--output_file', outputFile], {
+        env: {
+          ...process.env,
+          LD_LIBRARY_PATH: mergedLdLibraryPath,
+        },
+      });
       let stderr = '';
       let didTimeout = false;
       let settled = false;
