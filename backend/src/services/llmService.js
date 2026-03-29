@@ -6,7 +6,6 @@ const timeout = runtime.llm.timeoutMs;
 const defaultModel = runtime.llm.defaultModel;
 const DEFAULT_SYSTEM_PROMPT =
   process.env.LLM_STRICT_SYSTEM_PROMPT ||
-  process.env.LLM_SYSTEM_PROMPT ||
   'You are a helpful assistant. Always reply in English. Be concise.';
 
 function parseLogitBias() {
@@ -40,9 +39,9 @@ function buildPayload(prompt, model, options = {}, stream = false) {
   return {
     model: model || defaultModel,
     messages: buildMessages(prompt, options),
-    max_tokens: Number(options.max_tokens ?? 64),
-    temperature: Number(options.temperature ?? 0),
-    top_p: Number(options.top_p ?? 0.1),
+    max_tokens: Number(options.max_tokens ?? runtime.llm.maxTokens),
+    temperature: Number(options.temperature ?? runtime.llm.temperature),
+    top_p: Number(options.top_p ?? runtime.llm.topP),
     repeat_penalty: Number(options.repeat_penalty ?? 1.1),
     seed: Number(options.seed ?? 42),
     frequency_penalty: Number(options.frequency_penalty ?? runtime.llm.frequencyPenalty),
@@ -82,6 +81,7 @@ function normalizeAsciiResponse(text) {
 }
 
 async function chat(prompt, model = defaultModel, options = {}) {
+  const started = Date.now();
   const payload = buildPayload(prompt, model, options, false);
 
   try {
@@ -94,6 +94,7 @@ async function chat(prompt, model = defaultModel, options = {}) {
     return {
       response: normalizeAsciiResponse(content),
       model: response.data?.model || model,
+      duration_ms: Date.now() - started,
     };
   } catch (error) {
     throw createLlmUnavailableError(error);
@@ -136,8 +137,7 @@ async function ping() {
 async function listModels() {
   try {
     const response = await client.get('/v1/models');
-    const models = Array.isArray(response.data?.data) ? response.data.data : [];
-    return { models };
+    return Array.isArray(response.data?.data) ? response.data.data : [];
   } catch (error) {
     throw createLlmUnavailableError(error);
   }

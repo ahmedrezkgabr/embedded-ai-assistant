@@ -34,7 +34,8 @@ describe('llmService', () => {
 
     const result = await llmService.chat('ping');
 
-    expect(result).toEqual({ response: 'PONG', model: 'test-model' });
+    expect(result).toEqual(expect.objectContaining({ response: 'PONG', model: 'test-model' }));
+    expect(result.duration_ms).toBeGreaterThanOrEqual(0);
     expect(mockClient.post).toHaveBeenCalledWith(
       '/v1/chat/completions',
       expect.objectContaining({ stream: false })
@@ -61,7 +62,7 @@ describe('llmService', () => {
 
     const result = await llmService.listModels();
 
-    expect(result).toEqual({ models: [{ id: 'model-1' }, { id: 'model-2' }] });
+    expect(result).toEqual([{ id: 'model-1' }, { id: 'model-2' }]);
     expect(mockClient.get).toHaveBeenCalledWith('/v1/models');
   });
 });

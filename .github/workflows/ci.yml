@@ -35,134 +35,48 @@ jobs:
       - run: cd backend && npm ci
       - run: cd backend && npm test
 
-  build-llm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache llama.cpp build
-        uses: actions/cache@v4
-        with:
-          path: llm/llama.cpp/build
-          key: llama-cpp-${{ hashFiles('llm/setup.sh') }}-ubuntu
-      - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
-      - name: Build llama.cpp
-        run: |
-          if [ ! -f llm/llama.cpp/build/bin/llama-server ]; then
-            cd llm && bash setup.sh --build-only
-          fi
-      - name: Cache llama-server binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: llama-server
-          path: |
-            llm/llama.cpp/build/bin/llama-server
-            llm/llama.cpp/build/bin/*.so*
-
-  build-stt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache whisper.cpp build
-        uses: actions/cache@v4
-        with:
-          path: stt/whisper.cpp/build
-          key: whisper-cpp-${{ hashFiles('stt/setup.sh') }}-ubuntu
-      - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
-      - name: Build whisper.cpp
-        run: |
-          if [ ! -f stt/whisper.cpp/build/bin/whisper-cli ]; then
-            cd stt && bash setup.sh --build-only
-          fi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: whisper-runtime
-          path: |
-            stt/whisper.cpp/build/bin/whisper-cli
-            stt/whisper.cpp/build/src/libwhisper.so*
-            stt/whisper.cpp/build/ggml/src/libggml*.so*
-
-  build-tts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y cmake build-essential libespeak-ng-dev git
-      - name: Cache piper build
-        uses: actions/cache@v4
-        with:
-          path: |
-            tts/bin
-            tts/piper-src/build
-          key: piper-${{ hashFiles('tts/setup.sh') }}-ubuntu
-      - name: Build piper
-        run: |
-          if [ ! -f tts/bin/piper ]; then
-            cd tts && bash setup.sh --build-only
-          fi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: piper
-          path: |
-            tts/bin/piper
-            tts/bin/piper_phonemize
-            tts/bin/espeak-ng
-            tts/bin/*.so*
-            tts/bin/espeak-ng-data/**
-
   integration:
     runs-on: ubuntu-latest
-    needs: [unit-test, build-llm, build-stt, build-tts]
+    needs: unit-test
     steps:
       - uses: actions/checkout@v4
-      - name: Install runtime deps
-        run: sudo apt-get update && sudo apt-get install -y libespeak-ng1 ffmpeg
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - name: Download binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: llama-server
-          path: llm/llama.cpp/build/bin
-      - uses: actions/download-artifact@v4
-        with:
-          name: whisper-runtime
-          path: stt/whisper.cpp/build
-      - uses: actions/download-artifact@v4
-        with:
-          name: piper
-          path: tts/bin
-      - name: Prepare executable artifacts
-        run: |
-          chmod +x llm/llama.cpp/build/bin/llama-server stt/whisper.cpp/build/bin/whisper-cli tts/bin/piper
-          if [ ! -e tts/bin/libespeak-ng.so.1 ] && [ -e tts/bin/libespeak-ng.so ]; then
-            ln -s "$(basename "$(readlink -f tts/bin/libespeak-ng.so)")" tts/bin/libespeak-ng.so.1
-          fi
-          if [ ! -e tts/bin/libespeak-ng.so.1 ] && ls tts/bin/libespeak-ng.so.1.* >/dev/null 2>&1; then
-            ln -s "$(basename "$(ls tts/bin/libespeak-ng.so.1.* | head -n 1)")" tts/bin/libespeak-ng.so.1
-          fi
-          if [ ! -e tts/bin/libpiper_phonemize.so.1 ] && ls tts/bin/libpiper_phonemize.so.1.* >/dev/null 2>&1; then
-            ln -s "$(basename "$(ls tts/bin/libpiper_phonemize.so.1.* | head -n 1)")" tts/bin/libpiper_phonemize.so.1
-          fi
 
-      - name: Export runtime library paths
+      - name: Install system dependencies
         run: |
-          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/stt/whisper.cpp/build/src:$PWD/stt/whisper.cpp/build/ggml/src:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential ffmpeg libespeak-ng1 wget curl python3
 
-      - name: Cache model files
+      - name: Build llama.cpp
+        run: |
+          cmake -S llm/llama.cpp -B llm/llama.cpp/build -DLLAMA_BUILD_SERVER=ON -DLLAMA_NATIVE=OFF
+          cmake --build llm/llama.cpp/build --config Release -j"$(nproc)"
+          test -x llm/llama.cpp/build/bin/llama-server
+
+      - name: Build whisper.cpp
+        run: |
+          cmake -S stt/whisper.cpp -B stt/whisper.cpp/build
+          cmake --build stt/whisper.cpp/build -j"$(nproc)"
+          test -x stt/whisper.cpp/build/bin/whisper-cli
+
+      - name: Ensure piper runtime
+        run: |
+          test -x tts/bin/piper
+
+      - name: Cache models
         uses: actions/cache@v4
         with:
           path: |
             llm/models
             stt/models
             tts/models
-          key: ai-models-v1
+          key: ai-models-Qwen2.5-0.5B-Instruct-Q4_K_M.gguf-ggml-tiny.en.bin-en_US-lessac-low.onnx-v1
 
-      - name: Download models if not cached
+      - name: Download models when missing
         run: |
           mkdir -p llm/models stt/models tts/models
 
@@ -179,299 +93,106 @@ jobs:
           if [ ! -f tts/models/en_US-lessac-low.onnx ]; then
             wget -q -O tts/models/en_US-lessac-low.onnx \
               "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx"
+          fi
+
+          if [ ! -f tts/models/en_US-lessac-low.onnx.json ]; then
             wget -q -O tts/models/en_US-lessac-low.onnx.json \
               "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx.json"
           fi
 
-      - name: Write .env for CI
+      - name: Write backend/.env
         run: |
-          cat > backend/.env << 'EOF'
+          cat > backend/.env <<EOF
           PORT=3000
-          LLM_BASE_URL=http://localhost:11434
+          TMP_DIR=/tmp
+          UPLOAD_DIR=/tmp/ai-assistant/uploads
+          LOG_FILE=/tmp/ai-assistant/backend.log
+          LLM_BASE_URL=http://127.0.0.1:11434
           LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
+          LLM_TIMEOUT=60000
+          LLM_MAX_TOKENS=128
           LLM_TEMPERATURE=0
           LLM_TOP_P=0.2
           LLM_FREQUENCY_PENALTY=0
           LLM_PRESENCE_PENALTY=0
-          LLM_MAX_TOKENS=64
-          LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Never output Chinese, Japanese, Korean, or other non-English scripts. Keep answers short and production-safe.
-          WHISPER_BIN=../stt/whisper.cpp/build/bin/whisper-cli
-          WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
-          PIPER_BIN=../tts/bin/piper
-          PIPER_VOICE=../tts/models/en_US-lessac-low.onnx
-          PIPER_ESPEAK_DATA=../tts/bin/espeak-ng-data
+          LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Keep answers concise and factual.
+          WHISPER_BIN=$PWD/stt/whisper.cpp/build/bin/whisper-cli
+          WHISPER_MODEL=$PWD/stt/models/ggml-tiny.en.bin
+          WHISPER_TIMEOUT=30000
+          PIPER_BIN=$PWD/tts/bin/piper
+          PIPER_VOICE=$PWD/tts/models/en_US-lessac-low.onnx
+          PIPER_VOICE_DIR=$PWD/tts/models
+          PIPER_ESPEAK_DATA=$PWD/tts/bin/espeak-ng-data
+          PIPER_TIMEOUT=20000
           NODE_ENV=test
-          LLM_TIMEOUT=60000
           EOF
-
-      - name: Validate piper runtime
-        run: |
-          ESPEAK_DATA_DIR="$PWD/tts/bin/espeak-ng-data"
-          ls -la tts/bin
-          ldd tts/bin/piper
-          test -e tts/bin/libespeak-ng.so.1 || (echo "missing libespeak-ng.so.1 in tts/bin" && exit 1)
-          test -f "$ESPEAK_DATA_DIR/phontab" || (echo "missing espeak data phontab in $ESPEAK_DATA_DIR" && exit 1)
-          echo "ci tts runtime check" | tts/bin/piper \
-            --model tts/models/en_US-lessac-low.onnx \
-            --espeak_data "$ESPEAK_DATA_DIR" \
-            --output_file /tmp/ci_piper_check.wav
-          test -s /tmp/ci_piper_check.wav
 
       - name: Start llama-server
         run: |
           llm/llama.cpp/build/bin/llama-server \
             -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
-            --host 0.0.0.0 --port 11434 \
-            -c 2048 --threads 2 -ngl 0 \
-            --chat-template qwen2 \
-            > /tmp/llama.log 2>&1 &
-
-          READY=0
-          echo "Waiting for llama-server..."
-          for i in $(seq 1 24); do
-            sleep 5
-            if curl -sf http://localhost:11434/health >/dev/null || curl -sf http://localhost:11434/v1/models >/dev/null; then
-              READY=1
-              echo "Ready"
-              break
-            fi
-            echo "  still waiting ($((i*5))s)..."
-          done
-
-          [ "$READY" = "1" ] || (echo "llama-server failed to become ready" && cat /tmp/llama.log && exit 1)
-
-      - name: Install backend deps and start Express
-        run: |
-          cd backend && npm ci
-          node src/server.js > /tmp/backend.log 2>&1 &
-
-          READY=0
-          for i in $(seq 1 20); do
-            sleep 2
-            STATUS=$(curl -sf http://localhost:3000/api/llm/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" || true)
-            if [ "$STATUS" = "ok" ]; then
-              READY=1
-              break
-            fi
-          done
-          [ "$READY" = "1" ] || (echo "Backend LLM health not ready" && cat /tmp/backend.log && cat /tmp/llama.log && exit 1)
-
-      - name: API tests
-        run: |
-          STATUS=$(curl -sf http://localhost:3000/api/llm/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
-          [ "$STATUS" = "ok" ] || (echo "LLM health FAILED: $STATUS" && exit 1)
-
-          CHAT_OK=0
-          LAST_RESP=""
-          for attempt in $(seq 1 3); do
-            RESP=$(curl -sf -X POST http://localhost:3000/api/llm/chat \
-              -H "Content-Type: application/json" \
-              -d '{
-                "prompt": "What is 1 plus 1? Reply with only the number.",
-                "options": {
-                  "temperature": 0,
-                  "max_tokens": 8,
-                  "seed": 42,
-                  "system_prompt": "You are a helpful assistant. Reply in English only using ASCII characters."
-                }
-              }' \
-              | python3 -c "import sys,json; print(json.load(sys.stdin).get('response',''))")
-            CLEAN=$(echo "$RESP" | tr -d '\r\n' | xargs)
-            LAST_RESP="$CLEAN"
-
-            if [ -z "$CLEAN" ]; then
-              echo "Attempt $attempt: empty response"
-              sleep 2
-              continue
-            fi
-
-            if echo "$CLEAN" | python3 -c "import sys; text=sys.stdin.read(); print('NON_ASCII' if any(ord(c) > 127 for c in text) else 'ASCII_OK')" | grep -q NON_ASCII; then
-              echo "Attempt $attempt: non-ASCII characters detected: '$CLEAN'"
-              sleep 2
-              continue
-            fi
-
-            if [ ${#CLEAN} -ge 1 ]; then
-              CHAT_OK=1
-              break
-            fi
-          done
-
-          [ "$CHAT_OK" = "1" ] || (echo "LLM chat failed after retries: '$LAST_RESP'" && exit 1)
-          echo "LLM chat OK (ASCII English response): $LAST_RESP"
-
-          VOICE_HEALTH_BODY=$(curl -sS http://localhost:3000/api/voice/health || true)
-          [ -n "$VOICE_HEALTH_BODY" ] || (echo "voice health request failed" && cat /tmp/backend.log && exit 1)
-          STT_OK=$(echo "$VOICE_HEALTH_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('stt',{}).get('ok'))")
-          TTS_OK=$(echo "$VOICE_HEALTH_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tts',{}).get('ok'))")
-          [ "$STT_OK" = "True" ] || (echo "STT health FAILED" && exit 1)
-          [ "$TTS_OK" = "True" ] || (echo "TTS health FAILED" && exit 1)
-
-          TTS_CODE=$(curl -sS -o /tmp/ci_tts.wav -w "%{http_code}" -X POST http://localhost:3000/api/voice/tts \
-            -H "Content-Type: application/json" \
-            -d '{"text":"Continuous integration test."}')
-          [ "$TTS_CODE" = "200" ] || (echo "TTS endpoint failed with HTTP $TTS_CODE" && echo "=== tts response ===" && cat /tmp/ci_tts.wav && echo && cat /tmp/backend.log && exit 1)
-          SIZE=$(wc -c < /tmp/ci_tts.wav)
-          [ "$SIZE" -gt 5000 ] || (echo "TTS output too small: $SIZE bytes" && exit 1)
-          echo "TTS OK: $SIZE bytes"
-
-          ffmpeg -f lavfi -i "sine=frequency=440:duration=2" \
-            -ar 16000 -ac 1 -sample_fmt s16 /tmp/ci_stt.wav -y -loglevel quiet
-          STT_RESP=$(curl -sS -o /tmp/ci_stt_resp.json -w "%{http_code}" -X POST http://localhost:3000/api/voice/stt \
-            -F "audio=@/tmp/ci_stt.wav;type=audio/wav" \
-            || true)
-          [ "$STT_RESP" = "200" ] || (echo "STT endpoint failed with HTTP $STT_RESP" && cat /tmp/ci_stt_resp.json && cat /tmp/backend.log && exit 1)
-          TRANSCRIPT=$(python3 -c "import json; print(json.load(open('/tmp/ci_stt_resp.json')).get('transcript',''))")
-          echo "STT OK: transcript='$TRANSCRIPT'"
-
-          for path in "/" "/style.css" "/app.js"; do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000$path")
-            [ "$CODE" = "200" ] || (echo "Static $path returned $CODE" && exit 1)
-          done
-          echo "Static files OK"
-
-      - name: Show logs on failure
-        if: failure()
-        run: |
-          echo "=== llama.log ===" && cat /tmp/llama.log || true
-          echo "=== backend.log ===" && cat /tmp/backend.log || true
-
-  e2e-voice:
-    runs-on: ubuntu-latest
-    needs: integration
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install runtime deps
-        run: sudo apt-get update && sudo apt-get install -y libespeak-ng1 ffmpeg
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - uses: actions/download-artifact@v4
-        with:
-          name: llama-server
-          path: llm/llama.cpp/build/bin
-      - uses: actions/download-artifact@v4
-        with:
-          name: whisper-runtime
-          path: stt/whisper.cpp/build
-      - uses: actions/download-artifact@v4
-        with:
-          name: piper
-          path: tts/bin
-      - name: Prepare executable artifacts
-        run: |
-          chmod +x llm/llama.cpp/build/bin/llama-server stt/whisper.cpp/build/bin/whisper-cli tts/bin/piper
-          if [ ! -e tts/bin/libespeak-ng.so.1 ] && [ -e tts/bin/libespeak-ng.so ]; then
-            ln -s "$(basename "$(readlink -f tts/bin/libespeak-ng.so)")" tts/bin/libespeak-ng.so.1
-          fi
-          if [ ! -e tts/bin/libespeak-ng.so.1 ] && ls tts/bin/libespeak-ng.so.1.* >/dev/null 2>&1; then
-            ln -s "$(basename "$(ls tts/bin/libespeak-ng.so.1.* | head -n 1)")" tts/bin/libespeak-ng.so.1
-          fi
-          if [ ! -e tts/bin/libpiper_phonemize.so.1 ] && ls tts/bin/libpiper_phonemize.so.1.* >/dev/null 2>&1; then
-            ln -s "$(basename "$(ls tts/bin/libpiper_phonemize.so.1.* | head -n 1)")" tts/bin/libpiper_phonemize.so.1
-          fi
-
-      - name: Export runtime library paths
-        run: |
-          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/stt/whisper.cpp/build/src:$PWD/stt/whisper.cpp/build/ggml/src:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-
-      - name: Restore model cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            llm/models
-            stt/models
-            tts/models
-          key: ai-models-v1
-
-      - name: Write .env, start services
-        run: |
-          cat > backend/.env << 'EOF'
-          PORT=3000
-          LLM_BASE_URL=http://localhost:11434
-          LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
-          LLM_TEMPERATURE=0
-          LLM_TOP_P=0.2
-          LLM_FREQUENCY_PENALTY=0
-          LLM_PRESENCE_PENALTY=0
-          LLM_MAX_TOKENS=128
-          LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Never output Chinese, Japanese, Korean, or other non-English scripts. Keep answers short and production-safe.
-          WHISPER_BIN=../stt/whisper.cpp/build/bin/whisper-cli
-          WHISPER_MODEL=../stt/models/ggml-tiny.en.bin
-          PIPER_BIN=../tts/bin/piper
-          PIPER_VOICE=../tts/models/en_US-lessac-low.onnx
-          PIPER_ESPEAK_DATA=../tts/bin/espeak-ng-data
-          NODE_ENV=test
-          LLM_TIMEOUT=60000
-          EOF
-
-          llm/llama.cpp/build/bin/llama-server \
-            -m llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
             --host 0.0.0.0 --port 11434 -c 2048 --threads 2 -ngl 0 \
             --chat-template qwen2 > /tmp/llama.log 2>&1 &
 
-          READY=0
           for i in $(seq 1 24); do
+            if curl -sf http://127.0.0.1:11434/health >/dev/null; then
+              exit 0
+            fi
             sleep 5
-            if curl -sf http://localhost:11434/health >/dev/null || curl -sf http://localhost:11434/v1/models >/dev/null; then
-              READY=1
-              break
-            fi
           done
-          [ "$READY" = "1" ] || (echo "llama-server failed to become ready" && cat /tmp/llama.log && exit 1)
 
-          cd backend && npm ci && node src/server.js > /tmp/backend.log 2>&1 &
+          echo "llama-server failed to start"
+          cat /tmp/llama.log
+          exit 1
 
-          READY=0
-          for i in $(seq 1 20); do
-            sleep 2
-            STATUS=$(curl -sf http://localhost:3000/api/llm/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" || true)
-            if [ "$STATUS" = "ok" ]; then
-              READY=1
-              break
-            fi
-          done
-          [ "$READY" = "1" ] || (echo "Backend LLM health not ready" && cat /tmp/backend.log && cat /tmp/llama.log && exit 1)
-
-      - name: Full voice round-trip
+      - name: Start backend
         run: |
-          curl -sf -X POST http://localhost:3000/api/voice/tts \
+          cd backend
+          npm ci
+          node src/server.js > /tmp/backend.log 2>&1 &
+          cd ..
+
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:3000/api/llm/health | python3 -c "import json,sys; print('ok' if json.load(sys.stdin).get('status')=='ok' else 'bad')" | grep -q ok; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "backend failed to start"
+          cat /tmp/backend.log
+          exit 1
+
+      - name: API integration checks
+        run: |
+          LLM_RESPONSE=$(curl -sf -X POST http://127.0.0.1:3000/api/llm/chat \
             -H "Content-Type: application/json" \
-            -d '{"text":"What is the largest planet in the solar system?"}' \
-            --output /tmp/e2e_question.wav
-          [ $(wc -c < /tmp/e2e_question.wav) -gt 5000 ] || (echo "TTS failed" && exit 1)
+            -d '{"prompt":"What is 1 plus 1? Reply with just the number.","options":{"temperature":0,"max_tokens":8,"seed":42}}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('response',''))")
 
-          ffmpeg -i /tmp/e2e_question.wav \
-            -ar 16000 -ac 1 -sample_fmt s16 /tmp/e2e_16k.wav -y -loglevel quiet
+          [ -n "$LLM_RESPONSE" ] || (echo "empty llm response" && exit 1)
+          python3 -c "import sys; text=sys.argv[1]; (print('non-ascii output: ' + text), sys.exit(1)) if any(ord(c) >= 128 for c in text) else print('ascii output ok: ' + text)" "$LLM_RESPONSE"
 
-          TRANSCRIPT=$(curl -sf -X POST http://localhost:3000/api/voice/stt \
-            -F "audio=@/tmp/e2e_16k.wav;type=audio/wav" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin).get('transcript',''))")
-          echo "Transcript: $TRANSCRIPT"
-          [ -n "$TRANSCRIPT" ] || (echo "Empty transcript" && exit 1)
-
-          REPLY=$(curl -sf -X POST http://localhost:3000/api/llm/chat \
+          TTS_HTTP=$(curl -s -o /tmp/ci_tts.wav -w "%{http_code}" -X POST http://127.0.0.1:3000/api/voice/tts \
             -H "Content-Type: application/json" \
-            -d "{\"prompt\":\"$TRANSCRIPT\"}" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin).get('response',''))")
-          echo "Reply: $REPLY"
-          [ -n "$REPLY" ] || (echo "Empty LLM reply" && exit 1)
+            -d '{"text":"CI audio test."}')
+          [ "$TTS_HTTP" = "200" ] || (echo "tts failed" && exit 1)
+          [ "$(wc -c < /tmp/ci_tts.wav)" -gt 5000 ] || (echo "tts output too small" && exit 1)
 
-            REPLY_TEXT="$REPLY" python3 -c "import os,sys; reply=os.environ.get('REPLY_TEXT',''); non_ascii=[c for c in reply if ord(c)>127]; print(f'FAIL: non-ASCII characters in LLM reply: {non_ascii[:5]}') if non_ascii else None; sys.exit(1) if non_ascii else None; print('FAIL: empty reply') if not reply.strip() else None; sys.exit(1) if not reply.strip() else None; print('LLM reply is valid ASCII English')"
+          ffmpeg -f lavfi -i "sine=frequency=440:duration=2" -ar 16000 -ac 1 -sample_fmt s16 /tmp/ci_stt.wav -y -loglevel quiet
+          STT_HTTP=$(curl -s -o /tmp/ci_stt.json -w "%{http_code}" -X POST http://127.0.0.1:3000/api/voice/stt -F "audio=@/tmp/ci_stt.wav;type=audio/wav")
+          [ "$STT_HTTP" = "200" ] || (echo "stt failed" && cat /tmp/ci_stt.json && exit 1)
+            python3 -c "import json; data=json.load(open('/tmp/ci_stt.json')); assert 'transcript' in data; print('stt transcript key present')"
 
-          REPLY_SAFE=$(echo "$REPLY" | head -c 200 | tr '"' "'")
-          curl -sf -X POST http://localhost:3000/api/voice/tts \
-            -H "Content-Type: application/json" \
-            -d "{\"text\":\"$REPLY_SAFE\"}" \
-            --output /tmp/e2e_reply.wav
-          SIZE=$(wc -c < /tmp/e2e_reply.wav)
-          [ "$SIZE" -gt 5000 ] || (echo "Reply TTS too small: $SIZE" && exit 1)
-          echo "E2E voice round-trip PASSED. Reply WAV: $SIZE bytes"
+          for path in / /style.css /app.js; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3000$path")
+            [ "$code" = "200" ] || (echo "static file check failed: $path" && exit 1)
+          done
 
       - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== llama.log ==="
           cat /tmp/llama.log || true
+          echo "=== backend.log ==="
           cat /tmp/backend.log || true

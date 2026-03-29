@@ -8,6 +8,7 @@ STT_MODELS_SRC="$ROOT_DIR/stt/models"
 TTS_MODELS_SRC="$ROOT_DIR/tts/models"
 BIN_STT="$ROOT_DIR/stt/whisper.cpp/build/bin/whisper-cli"
 BIN_TTS="$ROOT_DIR/tts/bin/piper"
+BIN_LLM="$ROOT_DIR/llm/llama.cpp/build/bin/llama-server"
 
 sudo mkdir -p /opt/ai-assistant/backend
 sudo mkdir -p /opt/ai-assistant/models
@@ -32,10 +33,13 @@ fi
 
 echo "Installing binaries..."
 if [ -x "$BIN_STT" ]; then
-  sudo install -m 0755 "$BIN_STT" /usr/local/bin/whisper-cli
+  sudo install -m 0755 "$BIN_STT" /usr/bin/whisper-cli
 fi
 if [ -x "$BIN_TTS" ]; then
-  sudo install -m 0755 "$BIN_TTS" /usr/local/bin/piper
+  sudo install -m 0755 "$BIN_TTS" /usr/bin/piper
+fi
+if [ -x "$BIN_LLM" ]; then
+  sudo install -m 0755 "$BIN_LLM" /usr/bin/llama-server
 fi
 
 echo "Installing node modules..."

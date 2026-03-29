@@ -1,20 +1,20 @@
 const fs = require('fs/promises');
-const { constants } = require('fs');
+const fsSync = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 const runtime = require('../config/runtime');
 
-const whisperBin = runtime.stt.whisperBin;
-const whisperModel = runtime.stt.whisperModel;
+const whisperBin = path.resolve(process.env.WHISPER_BIN || runtime.stt.whisperBin || '/usr/bin/whisper-cli');
+const whisperModel = path.resolve(process.env.WHISPER_MODEL || runtime.stt.whisperModel || '/usr/share/models/ggml-tiny.en.bin');
 
-function runWithTimeout(command, args, timeoutMs) {
+function runWhisper(args, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args);
+    const child = spawn(whisperBin, args);
     let stderr = '';
-    let didTimeout = false;
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      didTimeout = true;
+      timedOut = true;
       child.kill('SIGKILL');
     }, timeoutMs);
 
@@ -29,57 +29,47 @@ function runWithTimeout(command, args, timeoutMs) {
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (didTimeout) {
-        return reject(new Error('whisper-cli timed out'));
+      if (timedOut) {
+        reject(new Error('whisper-cli timed out'));
+        return;
       }
+
       if (code !== 0) {
-        return reject(new Error(`whisper-cli failed with code ${code}: ${stderr}`));
+        reject(new Error(`whisper-cli failed with code ${code}: ${stderr}`));
+        return;
       }
-      return resolve();
+
+      resolve();
     });
   });
 }
 
 async function transcribe(wavFilePath) {
-  if (typeof fs.mkdir === 'function') {
-    await fs.mkdir(path.dirname(runtime.stt.outputPrefix), { recursive: true });
-  }
+  const resolvedWavPath = path.resolve(wavFilePath);
   const outputBase = `${runtime.stt.outputPrefix}_${Date.now()}`;
+  const outputTextPath = `${outputBase}.txt`;
+
+  await fs.mkdir(path.dirname(outputBase), { recursive: true });
 
   try {
-    await runWithTimeout(
-      whisperBin,
-      ['-m', whisperModel, '-f', wavFilePath, '-otxt', '-of', outputBase],
+    await runWhisper(
+      ['-m', whisperModel, '-f', resolvedWavPath, '-otxt', '-of', outputBase],
       runtime.stt.timeoutMs
     );
 
-    const outputText = await fs.readFile(`${outputBase}.txt`, 'utf8');
-    return outputText.trim();
+    const text = await fs.readFile(outputTextPath, 'utf8');
+    return text.trim();
   } finally {
     await Promise.allSettled([
-      fs.unlink(wavFilePath),
-      fs.unlink(`${outputBase}.txt`),
+      fs.unlink(outputTextPath),
+      fs.unlink(resolvedWavPath),
     ]);
   }
 }
 
 async function ping() {
-  let binary = false;
-  let model = false;
-
-  try {
-    await fs.access(whisperBin, constants.X_OK);
-    binary = true;
-  } catch {
-    binary = false;
-  }
-
-  try {
-    await fs.access(whisperModel, constants.R_OK);
-    model = true;
-  } catch {
-    model = false;
-  }
+  const binary = fsSync.existsSync(whisperBin);
+  const model = fsSync.existsSync(whisperModel);
 
   return {
     ok: binary && model,

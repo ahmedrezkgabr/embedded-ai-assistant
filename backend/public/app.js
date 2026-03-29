@@ -322,7 +322,7 @@ async function loadModels() {
     modelSelect.innerHTML = '';
 
     const normalized = models.map((item) => item.id || item.name || item).filter(Boolean);
-    const fallback = normalized.length > 0 ? normalized : ['qwen2.5:0.5b'];
+    const fallback = normalized.length > 0 ? normalized : ['Qwen2.5-0.5B-Instruct-Q4_K_M.gguf'];
 
     fallback.forEach((modelName) => {
       const option = document.createElement('option');
@@ -333,8 +333,8 @@ async function loadModels() {
 
     state.currentModel = modelSelect.value;
   } catch {
-    modelSelect.innerHTML = '<option value="qwen2.5:0.5b">qwen2.5:0.5b</option>';
-    state.currentModel = 'qwen2.5:0.5b';
+    modelSelect.innerHTML = '<option value="Qwen2.5-0.5B-Instruct-Q4_K_M.gguf">Qwen2.5-0.5B-Instruct-Q4_K_M.gguf</option>';
+    state.currentModel = 'Qwen2.5-0.5B-Instruct-Q4_K_M.gguf';
   }
 }
 

@@ -71,7 +71,6 @@ function parseChatCompletionDelta(frame) {
 }
 
 async function chat(req, res, next) {
-  const started = Date.now();
   try {
     const prompt = String(req.body?.prompt || '').trim();
     if (!prompt) {
@@ -89,7 +88,7 @@ async function chat(req, res, next) {
     return res.json({
       response: result.response,
       model: result.model,
-      duration_ms: Date.now() - started,
+      duration_ms: result.duration_ms,
       requestId: req.requestId,
     });
   } catch (error) {
@@ -257,7 +256,7 @@ async function health(req, res, next) {
 async function models(req, res, next) {
   try {
     const data = await llmService.listModels();
-    return res.json({ ...data, requestId: req.requestId });
+    return res.json({ data, requestId: req.requestId });
   } catch (error) {
     return next(error);
   }

@@ -45,14 +45,38 @@ A complete, end-to-end, locally hosted AI assistant for embedded Linux. At runti
 - Storage: microSD or NVMe via HAT
 - Audio: USB mic + USB speaker (or I2S HAT)
 
-## Quick Start (Local Dev, no QEMU)
+## Quick start
 
-1. `bash llm/setup.sh`
-2. `bash stt/setup.sh`
-3. `bash tts/setup.sh`
-4. `cd backend && cp .env.example .env && npm install`
-5. `npm run dev`
-6. Open `http://localhost:3000`
+### 1. Clone and set up
+git clone <repo>
+cd embedded-ai-assistant
+bash scripts/setup.sh          # builds binaries, downloads models
+
+### 2. Verify setup
+bash scripts/check.sh          # prints PASS/FAIL for all 13 checks
+
+### 3. Start the system
+./start.sh                     # starts all services and prints URL
+
+### 4. Access from any device
+Open the URL printed by start.sh in any browser on your network.
+Example: http://192.168.1.42:3000
+
+### 5. Test the running system
+bash scripts/test.sh           # runs 8 end-to-end tests
+
+### 6. Stop the system
+./stop.sh                      # or press Ctrl+C in the start.sh terminal
+
+### Scripts reference
+| Script               | Purpose                                    |
+|----------------------|--------------------------------------------|
+| scripts/setup.sh     | one-time build and model download          |
+| scripts/check.sh     | preflight check, no services needed        |
+| start.sh             | start all services, print LAN URL          |
+| stop.sh              | stop all services                          |
+| scripts/test.sh      | run 8 end-to-end tests against running sys |
+| scripts/logs.sh      | tail all service logs with prefixes        |
 
 ## Quick Start (QEMU)
 

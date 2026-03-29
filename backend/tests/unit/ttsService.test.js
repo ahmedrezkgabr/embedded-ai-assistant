@@ -6,9 +6,13 @@ jest.mock('child_process', () => ({
 }));
 
 jest.mock('fs/promises', () => ({
+  mkdir: jest.fn(),
   readFile: jest.fn(),
   unlink: jest.fn(),
-  access: jest.fn(),
+}));
+
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
 }));
 
 process.env.PIPER_BIN = '/tmp/piper';
@@ -16,6 +20,7 @@ process.env.PIPER_VOICE = '/tmp/voice.onnx';
 
 const { spawn } = require('child_process');
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const ttsService = require('../../src/services/ttsService');
 
 function createSpawnedProcess(exitCode = 0) {
@@ -34,8 +39,10 @@ describe('ttsService', () => {
   beforeEach(() => {
     spawn.mockReset();
     fs.readFile.mockReset();
+    fs.mkdir.mockReset();
     fs.unlink.mockReset();
-    fs.access.mockReset();
+    fsSync.existsSync.mockReset();
+    fs.mkdir.mockResolvedValue(undefined);
     fs.unlink.mockResolvedValue(undefined);
   });
 
@@ -48,12 +55,7 @@ describe('ttsService', () => {
     expect(Buffer.isBuffer(result)).toBe(true);
     expect(spawn).toHaveBeenCalledWith(
       '/tmp/piper',
-      expect.any(Array),
-      expect.objectContaining({
-        env: expect.objectContaining({
-          LD_LIBRARY_PATH: expect.any(String),
-        }),
-      })
+      expect.any(Array)
     );
     expect(fs.readFile).toHaveBeenCalledWith(expect.stringMatching(/\.wav$/));
   });
@@ -65,10 +67,10 @@ describe('ttsService', () => {
   });
 
   test('ping() reports binary/model readiness', async () => {
-    fs.access.mockResolvedValue(undefined);
+    fsSync.existsSync.mockReturnValue(true);
 
     const result = await ttsService.ping();
 
-    expect(result).toEqual({ ok: true, binary: true, model: true });
+    expect(result).toEqual({ ok: true, binary: true, model: true, model_json: true });
   });
 });

@@ -1,139 +1,90 @@
 const fs = require('fs/promises');
-const { constants } = require('fs');
+const fsSync = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 const runtime = require('../config/runtime');
 
-const piperBin = path.resolve(runtime.tts.piperBin);
-const defaultVoice = runtime.tts.defaultVoice;
+const piperBin = path.resolve(process.env.PIPER_BIN || runtime.tts.piperBin || '/usr/bin/piper');
+const defaultVoice = path.resolve(process.env.PIPER_VOICE || runtime.tts.defaultVoice || '/usr/share/models/en_US-lessac-low.onnx');
 
 function resolveVoicePath(voiceName) {
   if (!voiceName) {
     return defaultVoice;
   }
 
-  if (voiceName.endsWith('.onnx') || voiceName.startsWith('/')) {
-    return voiceName;
+  if (voiceName.endsWith('.onnx') || path.isAbsolute(voiceName)) {
+    return path.resolve(voiceName);
   }
 
-  return path.join(runtime.tts.voiceDir, `${voiceName}.onnx`);
+  const voiceDir = path.resolve(process.env.PIPER_VOICE_DIR || runtime.tts.voiceDir || '/usr/share/models');
+  return path.resolve(path.join(voiceDir, `${voiceName}.onnx`));
+}
+
+function runPiper(modelPath, outputFile, text) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(piperBin, ['--model', modelPath, '--output_file', outputFile]);
+    let stderr = '';
+    let timedOut = false;
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, runtime.tts.timeoutMs);
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (timedOut) {
+        reject(new Error('piper timed out'));
+        return;
+      }
+
+      if (code !== 0) {
+        reject(new Error(`piper failed with code ${code}: ${stderr}`));
+        return;
+      }
+
+      resolve();
+    });
+
+    child.stdin.write(String(text));
+    child.stdin.end();
+  });
 }
 
 async function synthesize(text, voiceName) {
-  if (typeof fs.mkdir === 'function') {
-    await fs.mkdir(path.dirname(runtime.tts.outputPrefix), { recursive: true });
-  }
   const outputFile = `${runtime.tts.outputPrefix}_${Date.now()}.wav`;
-  const modelPath = path.resolve(resolveVoicePath(voiceName));
-  const piperDir = path.dirname(piperBin);
-  const espeakData = runtime.tts.espeakData ? path.resolve(runtime.tts.espeakData) : '';
-  const piperArgs = ['--model', modelPath, '--output_file', outputFile];
-  if (espeakData) {
-    piperArgs.push('--espeak_data', espeakData);
-  }
-  const mergedLdLibraryPath = [
-    piperDir,
-    process.env.LD_LIBRARY_PATH || '',
-  ]
-    .filter(Boolean)
-    .join(':');
+  const modelPath = resolveVoicePath(voiceName);
+
+  await fs.mkdir(path.dirname(outputFile), { recursive: true });
 
   try {
-    await new Promise((resolve, reject) => {
-      const child = spawn(piperBin, piperArgs, {
-        cwd: piperDir,
-        env: {
-          ...process.env,
-          LD_LIBRARY_PATH: mergedLdLibraryPath,
-        },
-      });
-      let stderr = '';
-      let didTimeout = false;
-      let settled = false;
-
-      const rejectOnce = (error) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        reject(error);
-      };
-
-      const resolveOnce = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        resolve();
-      };
-
-      const timer = setTimeout(() => {
-        didTimeout = true;
-        child.kill('SIGKILL');
-      }, runtime.tts.timeoutMs);
-
-      child.stderr.on('data', (chunk) => {
-        stderr += chunk.toString();
-      });
-
-      child.on('error', (error) => {
-        clearTimeout(timer);
-        rejectOnce(error);
-      });
-
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        if (didTimeout) {
-          return rejectOnce(new Error('piper timed out'));
-        }
-        if (code !== 0) {
-          return rejectOnce(new Error(`piper failed with code ${code}: ${stderr}`));
-        }
-        return resolveOnce();
-      });
-
-      if (typeof child.stdin?.on === 'function') {
-        child.stdin.on('error', (error) => {
-          rejectOnce(new Error(`piper stdin error: ${error.message}${stderr ? ` | stderr: ${stderr}` : ''}`));
-        });
-      }
-
-      try {
-        child.stdin.write(text);
-        child.stdin.end();
-      } catch (error) {
-        rejectOnce(new Error(`piper stdin write failed: ${error.message}${stderr ? ` | stderr: ${stderr}` : ''}`));
-      }
-    });
-
-    return fs.readFile(outputFile);
+    await runPiper(modelPath, outputFile, text);
+    return await fs.readFile(outputFile);
   } finally {
     await fs.unlink(outputFile).catch(() => {});
   }
 }
 
 async function ping() {
-  let binary = false;
-  let model = false;
-
-  try {
-    await fs.access(piperBin, constants.X_OK);
-    binary = true;
-  } catch {
-    binary = false;
-  }
-
-  try {
-    await fs.access(defaultVoice, constants.R_OK);
-    model = true;
-  } catch {
-    model = false;
-  }
+  const voicePath = resolveVoicePath();
+  const binary = fsSync.existsSync(piperBin);
+  const model = fsSync.existsSync(voicePath);
+  const modelJson = fsSync.existsSync(`${voicePath}.json`);
 
   return {
-    ok: binary && model,
+    ok: binary && model && modelJson,
     binary,
     model,
+    model_json: modelJson,
   };
 }
 

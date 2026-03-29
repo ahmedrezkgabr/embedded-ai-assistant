@@ -6,9 +6,13 @@ jest.mock('child_process', () => ({
 }));
 
 jest.mock('fs/promises', () => ({
+  mkdir: jest.fn(),
   readFile: jest.fn(),
   unlink: jest.fn(),
-  access: jest.fn(),
+}));
+
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
 }));
 
 process.env.WHISPER_BIN = '/tmp/whisper-cli';
@@ -16,6 +20,7 @@ process.env.WHISPER_MODEL = '/tmp/model.bin';
 
 const { spawn } = require('child_process');
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const sttService = require('../../src/services/sttService');
 
 function createSpawnedProcess(exitCode = 0) {
@@ -33,8 +38,10 @@ describe('sttService', () => {
   beforeEach(() => {
     spawn.mockReset();
     fs.readFile.mockReset();
+    fs.mkdir.mockReset();
     fs.unlink.mockReset();
-    fs.access.mockReset();
+    fsSync.existsSync.mockReset();
+    fs.mkdir.mockResolvedValue(undefined);
     fs.unlink.mockResolvedValue(undefined);
   });
 
@@ -55,7 +62,7 @@ describe('sttService', () => {
   });
 
   test('ping() reports binary/model readiness', async () => {
-    fs.access.mockResolvedValue(undefined);
+    fsSync.existsSync.mockReturnValue(true);
 
     const result = await sttService.ping();
 
