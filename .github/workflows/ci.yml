@@ -77,8 +77,11 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: whisper-cli
-          path: stt/whisper.cpp/build/bin/whisper-cli
+          name: whisper-runtime
+          path: |
+            stt/whisper.cpp/build/bin/whisper-cli
+            stt/whisper.cpp/build/src/libwhisper.so*
+            stt/whisper.cpp/build/ggml/src/libggml*.so*
 
   build-tts:
     runs-on: ubuntu-latest
@@ -127,8 +130,8 @@ jobs:
           path: llm/llama.cpp/build/bin
       - uses: actions/download-artifact@v4
         with:
-          name: whisper-cli
-          path: stt/whisper.cpp/build/bin
+          name: whisper-runtime
+          path: stt/whisper.cpp/build
       - uses: actions/download-artifact@v4
         with:
           name: piper
@@ -148,7 +151,7 @@ jobs:
 
       - name: Export runtime library paths
         run: |
-          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/stt/whisper.cpp/build/src:$PWD/stt/whisper.cpp/build/ggml/src:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Cache model files
         uses: actions/cache@v4
@@ -351,8 +354,8 @@ jobs:
           path: llm/llama.cpp/build/bin
       - uses: actions/download-artifact@v4
         with:
-          name: whisper-cli
-          path: stt/whisper.cpp/build/bin
+          name: whisper-runtime
+          path: stt/whisper.cpp/build
       - uses: actions/download-artifact@v4
         with:
           name: piper
@@ -372,7 +375,7 @@ jobs:
 
       - name: Export runtime library paths
         run: |
-          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$PWD/llm/llama.cpp/build/bin:$PWD/stt/whisper.cpp/build/src:$PWD/stt/whisper.cpp/build/ggml/src:$PWD/tts/bin:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Restore model cache
         uses: actions/cache@v4
