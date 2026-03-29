@@ -53,12 +53,20 @@ jobs:
 
       - name: Build llama.cpp
         run: |
+          if [ ! -d llm/llama.cpp/.git ]; then
+            rm -rf llm/llama.cpp
+            git clone --depth 1 https://github.com/ggerganov/llama.cpp.git llm/llama.cpp
+          fi
           cmake -S llm/llama.cpp -B llm/llama.cpp/build -DLLAMA_BUILD_SERVER=ON -DLLAMA_NATIVE=OFF
           cmake --build llm/llama.cpp/build --config Release -j"$(nproc)"
           test -x llm/llama.cpp/build/bin/llama-server
 
       - name: Build whisper.cpp
         run: |
+          if [ ! -d stt/whisper.cpp/.git ]; then
+            rm -rf stt/whisper.cpp
+            git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git stt/whisper.cpp
+          fi
           cmake -S stt/whisper.cpp -B stt/whisper.cpp/build
           cmake --build stt/whisper.cpp/build -j"$(nproc)"
           test -x stt/whisper.cpp/build/bin/whisper-cli
