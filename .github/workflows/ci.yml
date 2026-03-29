@@ -73,6 +73,35 @@ jobs:
 
       - name: Ensure piper runtime
         run: |
+          mkdir -p tts/bin
+
+          if [ ! -x tts/bin/piper ]; then
+            ARCH="$(uname -m)"
+            case "$ARCH" in
+              x86_64)
+                PIPER_URL="https://github.com/rhasspy/piper/releases/latest/download/piper_linux_x86_64.tar.gz"
+                ;;
+              aarch64)
+                PIPER_URL="https://github.com/rhasspy/piper/releases/latest/download/piper_linux_aarch64.tar.gz"
+                ;;
+              *)
+                echo "Unsupported architecture for piper: $ARCH"
+                exit 1
+                ;;
+            esac
+
+            wget -q -O /tmp/piper_release.tar.gz "$PIPER_URL"
+            rm -rf /tmp/piper_extract
+            mkdir -p /tmp/piper_extract
+            tar -xzf /tmp/piper_release.tar.gz -C /tmp/piper_extract
+
+            PIPER_FOUND="$(find /tmp/piper_extract -type f -name piper | head -n 1 || true)"
+            [ -n "$PIPER_FOUND" ] || (echo "piper binary not found in archive" && exit 1)
+
+            cp -a "$(dirname "$PIPER_FOUND")"/. tts/bin/
+          fi
+
+          chmod +x tts/bin/piper
           test -x tts/bin/piper
 
       - name: Cache models
