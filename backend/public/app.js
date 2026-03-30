@@ -391,9 +391,9 @@ function setMicState(mode, statusText) {
   if (mode === 'recording') {
     micBtn.textContent = '●';
   } else if (mode === 'processing') {
-    micBtn.textContent = '⏳';
+    micBtn.textContent = '꩜';
   } else {
-    micBtn.textContent = '🎤';
+    micBtn.textContent = '၊၊||၊';
   }
 }
 
