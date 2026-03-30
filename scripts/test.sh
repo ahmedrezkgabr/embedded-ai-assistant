@@ -69,10 +69,10 @@ PY
   if [ -n "$LLM_REPLY" ] && [ "$(ascii_only "$LLM_REPLY")" = "1" ]; then
     mark 2 "LLM English reply" "1" "reply='$LLM_REPLY'"
   else
-    mark 2 "LLM English reply" "0" "Check LLM_STRICT_SYSTEM_PROMPT in backend/.env and --chat-template qwen2 in start.sh"
+    mark 2 "LLM English reply" "0" "Check LLM_STRICT_SYSTEM_PROMPT in backend/.env and --chat-template chatml in start.sh"
   fi
 else
-  mark 2 "LLM English reply" "0" "Check LLM_STRICT_SYSTEM_PROMPT in backend/.env and --chat-template qwen2 in start.sh"
+  mark 2 "LLM English reply" "0" "Check LLM_STRICT_SYSTEM_PROMPT in backend/.env and --chat-template chatml in start.sh"
 fi
 
 # TEST 3

@@ -26,14 +26,27 @@ TAIL_LLAMA_PID=""
 
 check_ok=0
 
-red='\033[0;31m'
-green='\033[0;32m'
-cyan='\033[0;36m'
-reset='\033[0m'
+# ── Color setup ──────────────────────────────────────────────
+# Use ANSI-C quoting ($'...') so \033 is interpreted as ESC
+if command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
+  CYAN=$(tput setaf 6)
+  GREEN=$(tput setaf 2)
+  YELLOW=$(tput setaf 3)
+  RED=$(tput setaf 1)
+  BOLD=$(tput bold)
+  RESET=$(tput sgr0)
+else
+  CYAN=$'\033[0;36m'
+  GREEN=$'\033[0;32m'
+  YELLOW=$'\033[0;33m'
+  RED=$'\033[0;31m'
+  BOLD=$'\033[1m'
+  RESET=$'\033[0m'
+fi
 
-pass() { echo -e "${green}[PASS]${reset} $*"; }
-fail() { echo -e "${red}[FAIL]${reset} $*"; }
-info() { echo -e "${cyan}[INFO]${reset} $*"; }
+pass()  { printf "${GREEN}[PASS]${RESET}  %s\n" "$*"; }
+fail()  { printf "${RED}[FAIL]${RESET}  %s\n" "$*"; }
+info()  { printf "${CYAN}[INFO]${RESET}  %s\n" "$*"; }
 
 cleanup() {
   [ -n "$TAIL_BACKEND_PID" ] && kill "$TAIL_BACKEND_PID" 2>/dev/null || true
@@ -140,43 +153,149 @@ NODE_ENV=production
 EOF
 }
 
+# ── Health check: llama-server ───────────────────────────────
 wait_llama() {
+  info "Waiting for llama-server..."
   local waited=0
   while [ "$waited" -lt "$STARTUP_TIMEOUT" ]; do
-    if curl -sf "http://127.0.0.1:$LLM_PORT/health" >/dev/null 2>&1; then
-      return 0
-    fi
     sleep 2
     waited=$((waited + 2))
+
+    # Check process is still alive
+    if ! kill -0 "$LLAMA_PID" 2>/dev/null; then
+      fail "llama-server process died (PID $LLAMA_PID)"
+      fail "Last 20 lines of llama log:"
+      tail -20 "$LOG_DIR/llama.log" >&2
+      return 1
+    fi
+
+    # Try to get health response
+    HEALTH_BODY=$(curl -s \
+      --max-time 3 \
+      --connect-timeout 2 \
+      "http://127.0.0.1:${LLM_PORT}/health" \
+      2>/dev/null || true)
+
+    # Skip empty responses silently (not ready yet)
+    if [ -z "$HEALTH_BODY" ]; then
+      continue
+    fi
+
+    # llama-server /health returns {"status":"ok"} or just "ok"
+    if echo "$HEALTH_BODY" | grep -q '"ok"\|"status":"ok"\|ok'; then
+      return 0
+    fi
+
+    info "  llama-server not ready yet (${waited}s / ${STARTUP_TIMEOUT}s)..."
   done
   return 1
 }
 
+# ── Health check: Express backend ────────────────────────────
 wait_backend() {
+  info "Waiting for Express backend..."
   local waited=0
+  local BACKEND_READY=0
   while [ "$waited" -lt "$STARTUP_TIMEOUT" ]; do
-    if curl -sf "http://127.0.0.1:$BACKEND_PORT/api/llm/health" | python3 -c "import json,sys; print('ok' if json.load(sys.stdin).get('status')=='ok' else 'bad')" | grep -q ok; then
-      return 0
-    fi
     sleep 2
     waited=$((waited + 2))
+
+    # Check process is still alive
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+      fail "Express backend process died (PID $BACKEND_PID)"
+      fail "Last 20 lines of backend log:"
+      tail -20 "$LOG_DIR/backend.log" >&2
+      return 1
+    fi
+
+    # Try to get the health response
+    HEALTH_BODY=$(curl -s \
+      --max-time 3 \
+      --connect-timeout 2 \
+      "http://127.0.0.1:${BACKEND_PORT}/api/llm/health" \
+      2>/dev/null || true)
+
+    # Skip empty responses silently (backend not ready yet)
+    if [ -z "$HEALTH_BODY" ]; then
+      continue
+    fi
+
+    # Parse the status field safely
+    STATUS=$(echo "$HEALTH_BODY" \
+      | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print(d.get('status', ''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+
+    if [ "$STATUS" = "ok" ]; then
+      BACKEND_READY=1
+      break
+    fi
+
+    info "  backend not ready yet (${waited}s / ${STARTUP_TIMEOUT}s)..."
   done
-  return 1
+
+  if [ "$BACKEND_READY" = "0" ]; then
+    return 1
+  fi
+  return 0
 }
 
+# ── Smoke test ───────────────────────────────────────────────
 smoke_test() {
-  local llm_resp
-  llm_resp="$(curl -sf -X POST "http://127.0.0.1:$BACKEND_PORT/api/llm/chat" -H "Content-Type: application/json" -d '{"prompt":"What is 1 plus 1? Reply with just the number.","options":{"temperature":0,"max_tokens":8,"seed":42}}' | python3 -c "import json,sys; print(json.load(sys.stdin).get('response',''))")"
-  if [ -z "$llm_resp" ] || ! python3 - "$llm_resp" <<'PY'
-import sys
-text=sys.argv[1]
-sys.exit(0 if text and all(ord(c)<128 for c in text) else 1)
-PY
-  then
-    fail "Smoke test failed (LLM English/ASCII). Fix: check LLM_STRICT_SYSTEM_PROMPT and --chat-template qwen2"
+  SMOKE_REPLY=$(curl -s \
+    --max-time 30 \
+    --connect-timeout 5 \
+    -X POST "http://127.0.0.1:${BACKEND_PORT}/api/llm/chat" \
+    -H "Content-Type: application/json" \
+    -d '{"prompt":"What is 1 plus 1? Reply with just the number.","options":{"temperature":0,"max_tokens":8,"seed":42}}' \
+    2>/dev/null || true)
+
+  if [ -z "$SMOKE_REPLY" ]; then
+    fail "Smoke test: empty response from backend"
     exit 1
   fi
 
+  SMOKE_TEXT=$(echo "$SMOKE_REPLY" \
+    | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print(d.get('response', ''))
+except Exception as e:
+    print(f'PARSE_ERROR: {e}', file=sys.stderr)
+    print('')
+" 2>/tmp/smoke_parse_err || true)
+
+  if [ -z "$SMOKE_TEXT" ]; then
+    fail "Smoke test: could not parse LLM response"
+    fail "Raw response: $SMOKE_REPLY"
+    PARSE_ERR=$(cat /tmp/smoke_parse_err 2>/dev/null || true)
+    [ -n "$PARSE_ERR" ] && fail "Parse error: $PARSE_ERR"
+    exit 1
+  fi
+
+  # ASCII check
+  if python3 -c "
+import sys
+text = sys.argv[1]
+bad = [c for c in text if ord(c) > 127]
+sys.exit(1 if bad else 0)
+" "$SMOKE_TEXT" 2>/dev/null; then
+    pass "Smoke tests passed: '$SMOKE_TEXT'"
+  else
+    fail "Smoke test: LLM returned non-ASCII output: '$SMOKE_TEXT'"
+    fail "System prompt may not be reaching llama-server."
+    fail "Check LLM_STRICT_SYSTEM_PROMPT in .env and"
+    fail "--chat-template chatml in llama-server startup."
+    exit 1
+  fi
+
+  # TTS smoke
   local tts_size
   tts_size="$(curl -sf -X POST "http://127.0.0.1:$BACKEND_PORT/api/voice/tts" -H "Content-Type: application/json" -d '{"text":"System ready."}' --output /tmp/ai_start_smoke.wav && wc -c < /tmp/ai_start_smoke.wav)"
   if [ "$tts_size" -le 5000 ]; then
@@ -184,13 +303,18 @@ PY
     exit 1
   fi
 
-  pass "Smoke tests passed"
+  pass "TTS smoke test passed (${tts_size} bytes)"
 }
 
+# ── Log tailing ──────────────────────────────────────────────
 start_logs() {
   touch "$LOG_DIR/backend.log" "$LOG_DIR/llama.log"
 
-  tail -f "$LOG_DIR/backend.log" | sed 's/^/\033[0;36m[backend]\033[0m /' &
+  CYAN_SED=$'\033[0;36m'
+  YELLOW_SED=$'\033[0;33m'
+  RESET_SED=$'\033[0m'
+
+  tail -f "$LOG_DIR/backend.log" | sed "s/^/${CYAN_SED}[backend]${RESET_SED} /" &
   TAIL_BACKEND_PID=$!
 
   tail -f "$LOG_DIR/llama.log" \
@@ -202,15 +326,16 @@ start_logs() {
       -e "load_tensors" \
       -e "print_info:" \
       -e "llama_model_loader" \
-    | sed 's/^/\033[0;33m[llama]  \033[0m /' &
+    | sed "s/^/${YELLOW_SED}[llama]  ${RESET_SED} /" &
   TAIL_LLAMA_PID=$!
 }
 
+# ── Main ─────────────────────────────────────────────────────
 preflight
 LAN_IP="$(detect_lan_ip)"
 write_env
 
-"$LLAMA_BIN" -m "$LLM_MODEL" --host 0.0.0.0 --port "$LLM_PORT" -c 2048 --threads 2 -ngl 0 --chat-template qwen2 > "$LOG_DIR/llama.log" 2>&1 &
+"$LLAMA_BIN" -m "$LLM_MODEL" --host 0.0.0.0 --port "$LLM_PORT" -c 2048 --threads 2 -ngl 0 --chat-template chatml > "$LOG_DIR/llama.log" 2>&1 &
 LLAMA_PID=$!
 
 if ! wait_llama; then

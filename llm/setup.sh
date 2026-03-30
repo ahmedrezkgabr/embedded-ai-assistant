@@ -38,4 +38,4 @@ exec "$LLAMA_DIR/build/bin/llama-server" \
   -m "$MODEL_FILE" \
   --host 0.0.0.0 --port 11434 \
   -c 2048 --threads 2 -ngl 0 \
-  --chat-template qwen2
+  --chat-template chatml

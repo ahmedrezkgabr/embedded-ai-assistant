@@ -115,6 +115,12 @@ async function chat(prompt, model = defaultModel, options = {}) {
   const started = Date.now();
   const payload = buildPayload(prompt, model, options, false);
 
+  // Log token count estimate for debugging (word count ≈ token count)
+  const estimatedTokens = payload.messages
+    .map(m => m.content.split(' ').length)
+    .reduce((a, b) => a + b, 0);
+  console.log(`[llmService] estimated tokens: ${estimatedTokens}, model: ${payload.model}, messages: ${payload.messages.length}`);
+
   await acquireQueue();
   try {
     const requestConfig = options.signal ? { signal: options.signal } : undefined;

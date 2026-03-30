@@ -13,13 +13,17 @@ fi
 mkdir -p "$LOG_DIR"
 touch "$BACKEND_LOG" "$LLAMA_LOG"
 
+CYAN=$'\033[0;36m'
+YELLOW=$'\033[0;33m'
+RESET=$'\033[0m'
+
 tail -f "$BACKEND_LOG" \
-  | sed 's/^/\033[0;36m[backend]\033[0m /' &
+  | sed "s/^/${CYAN}[backend]${RESET} /" &
 BACKEND_PID=$!
 
 if [ "$VERBOSE" -eq 1 ]; then
   tail -f "$LLAMA_LOG" \
-    | sed 's/^/\033[0;33m[llama]  \033[0m /' &
+    | sed "s/^/${YELLOW}[llama]  ${RESET} /" &
 else
   tail -f "$LLAMA_LOG" \
     | grep --line-buffered -v \
@@ -30,7 +34,7 @@ else
       -e "load_tensors" \
       -e "print_info:" \
       -e "llama_model_loader" \
-    | sed 's/^/\033[0;33m[llama]  \033[0m /' &
+    | sed "s/^/${YELLOW}[llama]  ${RESET} /" &
 fi
 LLAMA_PID=$!
 
