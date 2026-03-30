@@ -1,3 +1,4 @@
+const fs = require('fs/promises');
 const sttService = require('../services/sttService');
 const ttsService = require('../services/ttsService');
 
@@ -11,7 +12,15 @@ async function speechToText(req, res, next) {
     const transcript = await sttService.transcribe(req.file.path);
     return res.json({ transcript, duration_ms: Date.now() - started, requestId: req.requestId });
   } catch (error) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      error.status = 413;
+      error.message = 'File too large (max 10 MB)';
+    }
     return next(error);
+  } finally {
+    if (req.file?.path) {
+      await fs.unlink(req.file.path).catch(() => {});
+    }
   }
 }
 

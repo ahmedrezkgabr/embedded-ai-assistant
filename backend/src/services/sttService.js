@@ -2,6 +2,7 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
+const crypto = require('crypto');
 const runtime = require('../config/runtime');
 
 const whisperBin = path.resolve(process.env.WHISPER_BIN || runtime.stt.whisperBin || '/usr/bin/whisper-cli');
@@ -46,7 +47,7 @@ function runWhisper(args, timeoutMs) {
 
 async function transcribe(wavFilePath) {
   const resolvedWavPath = path.resolve(wavFilePath);
-  const outputBase = `${runtime.stt.outputPrefix}_${Date.now()}`;
+  const outputBase = `${runtime.stt.outputPrefix}_${crypto.randomUUID()}`;
   const outputTextPath = `${outputBase}.txt`;
 
   await fs.mkdir(path.dirname(outputBase), { recursive: true });

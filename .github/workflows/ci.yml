@@ -139,7 +139,7 @@ jobs:
 
       - name: Write backend/.env
         run: |
-          cat > backend/.env <<EOF
+          cat > backend/.env <<'EOF'
           PORT=3000
           TMP_DIR=/tmp
           UPLOAD_DIR=/tmp/ai-assistant/uploads
@@ -163,6 +163,7 @@ jobs:
           PIPER_TIMEOUT=20000
           NODE_ENV=test
           EOF
+          sed -i 's/^[[:space:]]*//' backend/.env
 
       - name: Start llama-server
         run: |
@@ -219,7 +220,14 @@ jobs:
           ffmpeg -f lavfi -i "sine=frequency=440:duration=2" -ar 16000 -ac 1 -sample_fmt s16 /tmp/ci_stt.wav -y -loglevel quiet
           STT_HTTP=$(curl -s -o /tmp/ci_stt.json -w "%{http_code}" -X POST http://127.0.0.1:3000/api/voice/stt -F "audio=@/tmp/ci_stt.wav;type=audio/wav")
           [ "$STT_HTTP" = "200" ] || (echo "stt failed" && cat /tmp/ci_stt.json && exit 1)
-            python3 -c "import json; data=json.load(open('/tmp/ci_stt.json')); assert 'transcript' in data; print('stt transcript key present')"
+          python3 -c "import json; data=json.load(open('/tmp/ci_stt.json')); assert 'transcript' in data and len(data['transcript']) > 0; print('stt transcript present and non-empty')"
+
+          curl -sN -X POST http://127.0.0.1:3000/api/llm/stream \
+            -H 'Content-Type: application/json' \
+            -d '{"prompt":"Say hi"}' > /tmp/sse.out
+          grep -q '^data: ' /tmp/sse.out || (echo "sse stream missing data lines" && exit 1)
+          grep -q '"done":true' /tmp/sse.out || (echo "sse stream missing done event" && exit 1)
+          echo "sse streaming ok"
 
           for path in / /style.css /app.js; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3000$path")

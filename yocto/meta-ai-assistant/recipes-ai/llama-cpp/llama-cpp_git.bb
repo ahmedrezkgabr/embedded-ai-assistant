@@ -6,7 +6,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=65fc6b420a6f24d1820d6f503f1c915f"
 inherit cmake systemd
 
 SRC_URI = "git://github.com/ggerganov/llama.cpp.git;branch=master;protocol=https"
-SRCREV = "${AUTOREV}"
+SRCREV = "ca2f5cc3f545a9ba6feeeaeefe0cb5c7d0d04c10"
 
 S = "${WORKDIR}/git"
 

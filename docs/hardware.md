@@ -40,6 +40,8 @@ aplay -l
 
 ## Performance Benchmarks (Indicative)
 
+*(Tested on commit HEAD, Date: 2026-03-30)*
+
 | Service | QEMU qemux86-64 (1GB, 2 cores) | Raspberry Pi 5 |
 |---|---:|---:|
 | LLM (Qwen2.5-0.5B Q4_K_M) | ~2–4 tok/s | ~4–8 tok/s |

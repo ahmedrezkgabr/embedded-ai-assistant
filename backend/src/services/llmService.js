@@ -4,9 +4,7 @@ const runtime = require('../config/runtime');
 const baseURL = runtime.llm.baseUrl;
 const timeout = runtime.llm.timeoutMs;
 const defaultModel = runtime.llm.defaultModel;
-const DEFAULT_SYSTEM_PROMPT =
-  process.env.LLM_STRICT_SYSTEM_PROMPT ||
-  'You are a helpful assistant. Always reply in English. Be concise.';
+const DEFAULT_SYSTEM_PROMPT = runtime.llm.strictEnglishSystemPrompt;
 
 function parseLogitBias() {
   if (!runtime.llm.logitBiasJson) {
@@ -22,15 +20,20 @@ function parseLogitBias() {
 }
 
 function buildMessages(prompt, options = {}) {
-  const systemPrompt =
-    options.systemPrompt ||
-    options.system_prompt ||
-    DEFAULT_SYSTEM_PROMPT;
+  const customSystemPrompt = String(
+    options.systemPrompt || options.system_prompt || ''
+  ).trim();
 
-  return [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: prompt },
+  const messages = [
+    { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
   ];
+
+  if (customSystemPrompt && customSystemPrompt !== DEFAULT_SYSTEM_PROMPT) {
+    messages.push({ role: 'system', content: customSystemPrompt });
+  }
+
+  messages.push({ role: 'user', content: prompt });
+  return messages;
 }
 
 function buildPayload(prompt, model, options = {}, stream = false) {
@@ -56,12 +59,40 @@ const client = axios.create({
   timeout,
 });
 
+let activeRequests = 0;
+const MAX_CONCURRENT = 1;
+const queue = [];
+
+function releaseQueue() {
+  if (queue.length > 0) {
+    const nextTask = queue.shift();
+    nextTask();
+  } else {
+    activeRequests = Math.max(0, activeRequests - 1);
+  }
+}
+
+function acquireQueue() {
+  return new Promise((resolve, reject) => {
+    if (activeRequests < MAX_CONCURRENT) {
+      activeRequests++;
+      resolve();
+    } else if (queue.length >= 5) {
+      const err = new Error('Too many requests in queue');
+      err.status = 429;
+      reject(err);
+    } else {
+      queue.push(resolve);
+    }
+  });
+}
+
 function createLlmUnavailableError(error) {
   const wrapped = new Error('LLM service unavailable');
   if (error?.response?.status) {
     wrapped.status = error.response.status;
   } else {
-    wrapped.status = 503;
+    wrapped.status = error?.status || 503;
   }
   return wrapped;
 }
@@ -84,6 +115,7 @@ async function chat(prompt, model = defaultModel, options = {}) {
   const started = Date.now();
   const payload = buildPayload(prompt, model, options, false);
 
+  await acquireQueue();
   try {
     const requestConfig = options.signal ? { signal: options.signal } : undefined;
     const response = requestConfig
@@ -98,19 +130,41 @@ async function chat(prompt, model = defaultModel, options = {}) {
     };
   } catch (error) {
     throw createLlmUnavailableError(error);
+  } finally {
+    releaseQueue();
   }
 }
 
 async function streamChat(prompt, model = defaultModel, options = {}) {
   const payload = buildPayload(prompt, model, options, true);
 
+  await acquireQueue();
   try {
     const requestConfig = {
       responseType: 'stream',
       ...(options.signal ? { signal: options.signal } : {}),
     };
-    return await client.post('/v1/chat/completions', payload, requestConfig);
+    const response = await client.post('/v1/chat/completions', payload, requestConfig);
+
+    let released = false;
+    const releaseOnce = () => {
+      if (!released) {
+        released = true;
+        releaseQueue();
+      }
+    };
+
+    response.data.on('end', releaseOnce);
+    response.data.on('error', releaseOnce);
+    response.data.on('close', releaseOnce);
+
+    if (options.signal) {
+      options.signal.addEventListener('abort', releaseOnce);
+    }
+
+    return response;
   } catch (error) {
+    releaseQueue();
     throw createLlmUnavailableError(error);
   }
 }

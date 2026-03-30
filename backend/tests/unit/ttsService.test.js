@@ -48,7 +48,7 @@ describe('ttsService', () => {
 
   test('synthesize() returns audio buffer', async () => {
     spawn.mockImplementation(() => createSpawnedProcess(0));
-    fs.readFile.mockResolvedValue(Buffer.from('wav-data'));
+    fs.readFile.mockResolvedValue(Buffer.alloc(128, 1));
 
     const result = await ttsService.synthesize('hello');
 
@@ -58,6 +58,13 @@ describe('ttsService', () => {
       expect.any(Array)
     );
     expect(fs.readFile).toHaveBeenCalledWith(expect.stringMatching(/\.wav$/));
+  });
+
+  test('synthesize() throws when piper output is empty', async () => {
+    spawn.mockImplementation(() => createSpawnedProcess(0));
+    fs.readFile.mockResolvedValue(Buffer.alloc(44));
+
+    await expect(ttsService.synthesize('hello')).rejects.toThrow('TTS produced empty audio');
   });
 
   test('synthesize() throws when piper exits non-zero', async () => {

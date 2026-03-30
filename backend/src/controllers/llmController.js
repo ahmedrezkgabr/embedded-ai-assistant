@@ -70,6 +70,13 @@ function parseChatCompletionDelta(frame) {
   }
 }
 
+function normalizeAsciiToken(token) {
+  return String(token || '')
+    .replace(/[^\x20-\x7E\n\r\t]/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
 async function chat(req, res, next) {
   try {
     const prompt = String(req.body?.prompt || '').trim();
@@ -204,9 +211,10 @@ async function stream(req, res, next) {
 
       for (const frame of parsed.frames) {
         const delta = parseChatCompletionDelta(frame);
-        if (delta.token) {
-          sendSse({ token: delta.token, done: false }, 'token');
-          sentenceExtractor.push(delta.token);
+        const normalizedToken = normalizeAsciiToken(delta.token);
+        if (normalizedToken) {
+          sendSse({ token: normalizedToken, done: false }, 'token');
+          sentenceExtractor.push(normalizedToken);
         }
         if (delta.done) {
           sentenceExtractor.flush();

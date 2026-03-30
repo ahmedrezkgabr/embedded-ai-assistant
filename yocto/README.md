@@ -14,3 +14,14 @@ This directory contains the `meta-ai-assistant` layer and helper scripts for bui
 
 Use `setup.sh` to clone required Yocto layers (`poky`, `meta-openembedded`, `meta-raspberrypi`).
 
+## Build prerequisites
+
+Before running a Yocto image build, ensure these model files already exist in the project workspace:
+
+- `llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`
+- `stt/models/ggml-tiny.en.bin`
+- `tts/models/en_US-lessac-low.onnx`
+- `tts/models/en_US-lessac-low.onnx.json`
+
+The backend recipe validates these files during `do_install` and fails early if any are missing.
+

@@ -2,6 +2,7 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
+const crypto = require('crypto');
 const runtime = require('../config/runtime');
 
 const piperBin = path.resolve(process.env.PIPER_BIN || runtime.tts.piperBin || '/usr/bin/piper');
@@ -61,14 +62,20 @@ function runPiper(modelPath, outputFile, text) {
 }
 
 async function synthesize(text, voiceName) {
-  const outputFile = `${runtime.tts.outputPrefix}_${Date.now()}.wav`;
+  const outputFile = `${runtime.tts.outputPrefix}_${crypto.randomUUID()}.wav`;
   const modelPath = resolveVoicePath(voiceName);
 
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
 
   try {
     await runPiper(modelPath, outputFile, text);
-    return await fs.readFile(outputFile);
+    const buffer = await fs.readFile(outputFile);
+
+    if (buffer.length <= 44) {
+      throw new Error('TTS produced empty audio');
+    }
+
+    return buffer;
   } finally {
     await fs.unlink(outputFile).catch(() => {});
   }

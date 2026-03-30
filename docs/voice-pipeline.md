@@ -7,7 +7,7 @@ The voice path remains fully local and offline:
 3. Browser uploads WAV to `POST /api/voice/stt`
 4. Backend executes `whisper-cli` with `ggml-tiny.en.bin`
 5. Transcript returns to browser
-6. Browser sends transcript to `POST /api/llm/chat` or `/api/llm/stream`
+6. Browser sends transcript to `POST /api/llm/stream`
 7. Backend forwards to `llama-server` hosting Qwen2.5-0.5B
 8. Assistant response text is displayed incrementally (SSE)
 9. Browser posts response text to `POST /api/voice/tts`

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LLM_MODEL_PATH="${LLM_MODEL_PATH:-/usr/share/models/qwen.gguf}"
-WHISPER_MODEL_PATH="${WHISPER_MODEL_PATH:-/usr/share/models/ggml-tiny.en.bin}"
-PIPER_VOICE_PATH="${PIPER_VOICE_PATH:-/usr/share/models/en_US-lessac-low.onnx}"
+LLM_MODEL_PATH="${LLM_MODEL_PATH:-/opt/ai-assistant/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf}"
+WHISPER_MODEL_PATH="${WHISPER_MODEL_PATH:-/opt/ai-assistant/models/ggml-tiny.en.bin}"
+PIPER_VOICE_PATH="${PIPER_VOICE_PATH:-/opt/ai-assistant/models/en_US-lessac-low.onnx}"
 
 WHISPER_BIN="${WHISPER_BIN:-/usr/bin/whisper-cli}"
 PIPER_BIN="${PIPER_BIN:-/usr/bin/piper}"

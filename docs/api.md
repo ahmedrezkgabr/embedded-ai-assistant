@@ -18,7 +18,7 @@ Request body:
     "seed": 42,
     "top_p": 0.2,
     "repeat_penalty": 1.1,
-    "systemPrompt": "You are a helpful assistant."
+    "system_prompt": "You are a helpful assistant."
   }
 }
 ```

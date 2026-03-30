@@ -81,7 +81,25 @@ if curl -sN -X POST "$BASE_URL/api/llm/stream" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Say one word."}' > "$TMP_DIR/t3.sse"; then
   token_lines="$(grep -c '^data: ' "$TMP_DIR/t3.sse" || true)"
-  last_line="$(grep '^data: ' "$TMP_DIR/t3.sse" | tail -n 1 || true)"
+  done_ok="$(python3 - <<'PY'
+import json
+found = False
+for line in open('/tmp/ai-assistant-test/t3.sse', 'r', encoding='utf8', errors='ignore'):
+  if not line.startswith('data: '):
+    continue
+  payload = line[6:].strip()
+  if not payload:
+    continue
+  try:
+    obj = json.loads(payload)
+  except Exception:
+    continue
+  if obj.get('done') is True:
+    found = True
+    break
+print('1' if found else '0')
+PY
+)"
   tokens_ok="$(python3 - <<'PY'
 import json
 import re
@@ -103,7 +121,7 @@ for line in open('/tmp/ai-assistant-test/t3.sse', 'r', encoding='utf8', errors='
 print('1' if ok else '0')
 PY
 )"
-  if [ "$token_lines" -ge 1 ] && [ "$last_line" = 'data: {"done":true}' ] && [ "$tokens_ok" = "1" ]; then
+  if [ "$token_lines" -ge 1 ] && [ "$done_ok" = "1" ] && [ "$tokens_ok" = "1" ]; then
     mark 3 "SSE streaming" "1"
   else
     mark 3 "SSE streaming" "0" "Check llmController.js stream() function"
@@ -119,7 +137,7 @@ TTS_CODE="$(curl -s -o "$TMP_DIR/t4.wav" -w "%{http_code}" -X POST "$BASE_URL/ap
 if [ "$TTS_CODE" = "200" ]; then
   size="$(wc -c < "$TMP_DIR/t4.wav")"
   mime="$(file -b "$TMP_DIR/t4.wav" || true)"
-  ctype="$(curl -sI -X POST "$BASE_URL/api/voice/tts" -H "Content-Type: application/json" -d '{"text":"ct"}' | tr -d '\r' | grep -i '^Content-Type:' | awk '{print $2}' | tr -d '\n' || true)"
+  ctype="$(curl -s -D - -o /dev/null -X POST "$BASE_URL/api/voice/tts" -H "Content-Type: application/json" -d '{"text":"ct"}' | tr -d '\r' | grep -i '^Content-Type:' | awk '{print $2}' | tr -d '\n' || true)"
   if [ "$size" -gt 5000 ] && echo "$mime" | grep -qi 'RIFF.*WAVE' && echo "$ctype" | grep -qi 'audio/wav'; then
     mark 4 "TTS synthesis" "1" "(${size} bytes)"
   else

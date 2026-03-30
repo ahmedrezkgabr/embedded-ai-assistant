@@ -17,9 +17,19 @@ do_install() {
 
   if [ -d ${TOPDIR}/../backend ]; then
     cp -a ${TOPDIR}/../backend/. ${D}/opt/ai-assistant/backend/
-    rm -rf ${D}/opt/ai-assistant/backend/node_modules
     rm -f ${D}/opt/ai-assistant/backend/.env
+
+    if [ -f ${D}/opt/ai-assistant/backend/package-lock.json ]; then
+      (cd ${D}/opt/ai-assistant/backend && npm ci --omit=dev --no-audit --no-fund)
+    else
+      bbfatal "backend/package-lock.json missing; cannot install production dependencies"
+    fi
   fi
+
+  [ -f ${TOPDIR}/../llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf ] || bbfatal "Missing required LLM model: llm/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf"
+  [ -f ${TOPDIR}/../stt/models/ggml-tiny.en.bin ] || bbfatal "Missing required STT model: stt/models/ggml-tiny.en.bin"
+  [ -f ${TOPDIR}/../tts/models/en_US-lessac-low.onnx ] || bbfatal "Missing required TTS model: tts/models/en_US-lessac-low.onnx"
+  [ -f ${TOPDIR}/../tts/models/en_US-lessac-low.onnx.json ] || bbfatal "Missing required TTS metadata: tts/models/en_US-lessac-low.onnx.json"
 
   if [ -d ${TOPDIR}/../llm/models ]; then
     cp -a ${TOPDIR}/../llm/models/*.gguf ${D}/opt/ai-assistant/models/ 2>/dev/null || true

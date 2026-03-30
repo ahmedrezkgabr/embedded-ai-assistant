@@ -3,3 +3,7 @@ DISTRO = "poky"
 ENABLE_UART = "1"
 DISABLE_SPLASH = "1"
 IMAGE_ROOTFS_EXTRA_SPACE = "2097152"
+
+# ALSA audio support for USB microphones and speakers
+MACHINE_FEATURES:append = " alsa"
+EXTRA_IMAGE_FEATURES:append = " hwcodecs"

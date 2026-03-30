@@ -13,10 +13,10 @@ module.exports = {
     logFile: process.env.LOG_FILE || path.join(tmpDir, 'ai-assistant', 'backend.log'),
   },
   llm: {
-    baseUrl: process.env.LLM_BASE_URL || 'http://127.0.0.1:8080',
+    baseUrl: process.env.LLM_BASE_URL || 'http://127.0.0.1:11434',
     timeoutMs: toNumber(process.env.LLM_TIMEOUT, 60000),
-    defaultModel: process.env.LLM_DEFAULT_MODEL || 'qwen2.5-0.5b-instruct-q4_k_m',
-    maxTokens: toNumber(process.env.LLM_MAX_TOKENS, 512),
+    defaultModel: process.env.LLM_DEFAULT_MODEL || 'Qwen2.5-0.5B-Instruct-Q4_K_M.gguf',
+    maxTokens: toNumber(process.env.LLM_MAX_TOKENS, 128),
     temperature: toNumber(process.env.LLM_TEMPERATURE, 0.0),
     topP: toNumber(process.env.LLM_TOP_P, 0.2),
     frequencyPenalty: toNumber(process.env.LLM_FREQUENCY_PENALTY, 0.0),

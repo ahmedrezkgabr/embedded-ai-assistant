@@ -6,8 +6,8 @@ const state = {
   isTTSEnabled: true,
   currentModel: '',
   settings: {
-    temperature: 0.7,
-    max_tokens: 256,
+    temperature: 0,
+    max_tokens: 128,
     systemPrompt: 'You are a helpful assistant.',
     voice: 'en_US-lessac-low',
   },
@@ -125,7 +125,12 @@ async function sendTextMessage(text) {
           continue;
         }
 
-        const parsed = JSON.parse(payload);
+        let parsed;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          continue;
+        }
         if (parsed.token) {
           assistant.content.textContent += parsed.token;
           chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -146,6 +151,21 @@ async function sendTextMessage(text) {
   }
 }
 
+function chooseMimeType() {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  for (const mime of candidates) {
+    if (MediaRecorder.isTypeSupported(mime)) {
+      return mime;
+    }
+  }
+  return '';
+}
+
 async function startRecording() {
   if (state.isRecording) {
     return;
@@ -153,7 +173,10 @@ async function startRecording() {
 
   state.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   state.recordedChunks = [];
-  state.mediaRecorder = new MediaRecorder(state.audioStream, { mimeType: 'audio/webm;codecs=opus' });
+
+  const mimeType = chooseMimeType();
+  const options = mimeType ? { mimeType } : {};
+  state.mediaRecorder = new MediaRecorder(state.audioStream, options);
   state.isRecording = true;
 
   setMicState('recording', 'Recording...');
@@ -203,7 +226,8 @@ function stopRecording() {
 }
 
 async function processAudioToWAV(chunks) {
-  const blob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
+  const mimeType = state.mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
+  const blob = new Blob(chunks, { type: mimeType });
   const inputBuffer = await blob.arrayBuffer();
   const audioContext = new AudioContext();
   const decoded = await audioContext.decodeAudioData(inputBuffer.slice(0));
@@ -246,6 +270,7 @@ async function processAudioToWAV(chunks) {
   promptInput.value = transcript;
 
   if (transcript.length > 2) {
+    setMicState('processing', 'Thinking...');
     await sendTextMessage(transcript);
   }
 
@@ -447,7 +472,11 @@ micBtn.addEventListener('click', async () => {
       stopRecording();
     }
   } catch (error) {
-    setMicState('idle', `Mic error: ${error.message}`);
+    if (error.name === 'NotAllowedError') {
+      setMicState('idle', 'Microphone access denied. Please allow mic access in browser settings and reload.');
+    } else {
+      setMicState('idle', `Mic error: ${error.message}`);
+    }
   }
 });
 
