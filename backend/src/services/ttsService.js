@@ -7,6 +7,7 @@ const runtime = require('../config/runtime');
 
 const piperBin = path.resolve(process.env.PIPER_BIN || runtime.tts.piperBin || '/usr/bin/piper');
 const defaultVoice = path.resolve(process.env.PIPER_VOICE || runtime.tts.defaultVoice || '/usr/share/models/en_US-lessac-low.onnx');
+const espeakData = process.env.PIPER_ESPEAK_DATA || runtime.tts.espeakData || '';
 
 function resolveVoicePath(voiceName) {
   if (!voiceName) {
@@ -23,7 +24,13 @@ function resolveVoicePath(voiceName) {
 
 function runPiper(modelPath, outputFile, text) {
   return new Promise((resolve, reject) => {
-    const child = spawn(piperBin, ['--model', modelPath, '--output_file', outputFile]);
+    const args = ['--model', modelPath, '--output_file', outputFile];
+
+    if (espeakData) {
+      args.push('--espeak_data', path.resolve(espeakData));
+    }
+
+    const child = spawn(piperBin, args);
     let stderr = '';
     let timedOut = false;
 
