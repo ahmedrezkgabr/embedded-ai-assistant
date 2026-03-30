@@ -3,6 +3,7 @@ const state = {
   audioStream: null,
   recordedChunks: [],
   isRecording: false,
+  isBusy: false,
   isTTSEnabled: true,
   currentModel: '',
   settings: {
@@ -20,6 +21,7 @@ const state = {
 };
 
 const chatWindow = document.getElementById('chat-window');
+const chatEmptyState = document.getElementById('chat-empty-state');
 const promptInput = document.getElementById('prompt-input');
 const sendBtn = document.getElementById('send-btn');
 const clearBtn = document.getElementById('clear-btn');
@@ -29,6 +31,9 @@ const waveformCanvas = document.getElementById('waveform');
 const ttsToggle = document.getElementById('tts-toggle');
 const modelSelect = document.getElementById('model-select');
 const voiceSelect = document.getElementById('voice-select');
+const settingsToggleBtn = document.getElementById('settings-toggle');
+const settingsDialog = document.getElementById('settings-dialog');
+const settingsCloseBtn = document.getElementById('settings-close');
 
 const temperatureInput = document.getElementById('temperature');
 const temperatureValue = document.getElementById('temperature-value');
@@ -38,6 +43,44 @@ const systemPromptInput = document.getElementById('system-prompt');
 const llmDot = document.getElementById('llm-dot');
 const sttDot = document.getElementById('stt-dot');
 const ttsDot = document.getElementById('tts-dot');
+
+const ICONS = {
+  mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4Zm-1 3.93V22h2v-3.07A7 7 0 0 0 19 12h-2a5 5 0 1 1-10 0H5a7 7 0 0 0 6 6.93Z"/></svg>',
+  send: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 3 10.53V12l7 2 2 7h1.47L21 3Z"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>',
+  spinner: '<svg class="spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" opacity="0.25"></circle><path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>',
+};
+
+function setButtonIcon(button, iconName) {
+  button.innerHTML = ICONS[iconName] || '';
+}
+
+function renderActionButtons() {
+  const micIcon = state.isBusy ? 'spinner' : state.isRecording ? 'stop' : 'mic';
+  const sendIcon = state.isBusy ? 'spinner' : 'send';
+
+  setButtonIcon(micBtn, micIcon);
+  setButtonIcon(sendBtn, sendIcon);
+
+  micBtn.classList.toggle('loading', state.isBusy);
+  sendBtn.classList.toggle('loading', state.isBusy);
+
+  micBtn.disabled = state.isBusy;
+  sendBtn.disabled = state.isBusy || state.isRecording;
+}
+
+function setBusyState(isBusy, statusText) {
+  state.isBusy = isBusy;
+  if (statusText) {
+    micStatus.textContent = statusText;
+  }
+  renderActionButtons();
+}
+
+function resizePromptInput() {
+  promptInput.style.height = 'auto';
+  promptInput.style.height = `${Math.min(promptInput.scrollHeight, 140)}px`;
+}
 
 function setDot(dot, ok) {
   dot.classList.toggle('ok', ok);
@@ -67,17 +110,36 @@ function appendMessage(role, text) {
 
   chatWindow.appendChild(wrap);
   chatWindow.scrollTop = chatWindow.scrollHeight;
+  syncChatEmptyState();
   return { wrap, content };
 }
 
-async function sendTextMessage(text) {
+function syncChatEmptyState() {
+  if (!chatWindow || !chatEmptyState) {
+    return;
+  }
+  const hasMessages = chatWindow.querySelector('.message') !== null;
+  chatEmptyState.hidden = hasMessages;
+}
+
+async function sendTextMessage(text, options = {}) {
   const prompt = String(text || '').trim();
   if (!prompt) {
     return;
   }
 
+  if (state.isBusy && !options.alreadyBusy) {
+    return;
+  }
+
+  const ownsBusyState = !options.alreadyBusy;
+  if (ownsBusyState) {
+    setBusyState(true, 'Thinking...');
+  }
+
   appendMessage('user', prompt);
   promptInput.value = '';
+  resizePromptInput();
 
   const assistant = appendMessage('assistant', '');
   assistant.content.classList.add('typing-cursor');
@@ -148,6 +210,10 @@ async function sendTextMessage(text) {
   } catch (error) {
     assistant.content.classList.remove('typing-cursor');
     assistant.content.textContent = `Error: ${error.message}`;
+  } finally {
+    if (ownsBusyState) {
+      setBusyState(false, state.isRecording ? 'Recording...' : 'Idle');
+    }
   }
 }
 
@@ -226,55 +292,64 @@ function stopRecording() {
 }
 
 async function processAudioToWAV(chunks) {
-  const mimeType = state.mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
-  const blob = new Blob(chunks, { type: mimeType });
-  const inputBuffer = await blob.arrayBuffer();
-  const audioContext = new AudioContext();
-  const decoded = await audioContext.decodeAudioData(inputBuffer.slice(0));
+  setBusyState(true, 'Transcribing...');
+  let audioContext;
 
-  const offlineContext = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
-  const source = offlineContext.createBufferSource();
-  const monoBuffer = offlineContext.createBuffer(1, decoded.length, decoded.sampleRate);
+  try {
+    const mimeType = state.mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
+    const blob = new Blob(chunks, { type: mimeType });
+    const inputBuffer = await blob.arrayBuffer();
+    audioContext = new AudioContext();
+    const decoded = await audioContext.decodeAudioData(inputBuffer.slice(0));
 
-  const left = decoded.getChannelData(0);
-  if (decoded.numberOfChannels > 1) {
-    const right = decoded.getChannelData(1);
-    const mixed = monoBuffer.getChannelData(0);
-    for (let i = 0; i < mixed.length; i += 1) {
-      mixed[i] = (left[i] + right[i]) * 0.5;
+    const offlineContext = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+    const source = offlineContext.createBufferSource();
+    const monoBuffer = offlineContext.createBuffer(1, decoded.length, decoded.sampleRate);
+
+    const left = decoded.getChannelData(0);
+    if (decoded.numberOfChannels > 1) {
+      const right = decoded.getChannelData(1);
+      const mixed = monoBuffer.getChannelData(0);
+      for (let i = 0; i < mixed.length; i += 1) {
+        mixed[i] = (left[i] + right[i]) * 0.5;
+      }
+    } else {
+      monoBuffer.copyToChannel(left, 0);
     }
-  } else {
-    monoBuffer.copyToChannel(left, 0);
+
+    source.buffer = monoBuffer;
+    source.connect(offlineContext.destination);
+    source.start(0);
+    const rendered = await offlineContext.startRendering();
+    const wavData = encodeWAV(rendered.getChannelData(0), 16000);
+
+    const formData = new FormData();
+    formData.append('audio', new Blob([wavData], { type: 'audio/wav' }), 'recording.wav');
+
+    const response = await fetch('/api/voice/stt', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('STT request failed');
+    }
+
+    const payload = await response.json();
+    const transcript = String(payload.transcript || '').trim();
+    promptInput.value = transcript;
+    resizePromptInput();
+
+    if (transcript.length > 2) {
+      setMicState('processing', 'Thinking...');
+      await sendTextMessage(transcript, { alreadyBusy: true });
+    }
+  } finally {
+    if (audioContext) {
+      await audioContext.close();
+    }
+    setBusyState(false, 'Idle');
   }
-
-  source.buffer = monoBuffer;
-  source.connect(offlineContext.destination);
-  source.start(0);
-  const rendered = await offlineContext.startRendering();
-  const wavData = encodeWAV(rendered.getChannelData(0), 16000);
-
-  const formData = new FormData();
-  formData.append('audio', new Blob([wavData], { type: 'audio/wav' }), 'recording.wav');
-
-  const response = await fetch('/api/voice/stt', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error('STT request failed');
-  }
-
-  const payload = await response.json();
-  const transcript = String(payload.transcript || '').trim();
-  promptInput.value = transcript;
-
-  if (transcript.length > 2) {
-    setMicState('processing', 'Thinking...');
-    await sendTextMessage(transcript);
-  }
-
-  await audioContext.close();
 }
 
 function encodeWAV(float32Array, sampleRate) {
@@ -387,14 +462,7 @@ function setMicState(mode, statusText) {
   micBtn.classList.remove('idle', 'recording', 'processing');
   micBtn.classList.add(mode);
   micStatus.textContent = statusText;
-
-  if (mode === 'recording') {
-    micBtn.textContent = '●';
-  } else if (mode === 'processing') {
-    micBtn.textContent = '꩜';
-  } else {
-    micBtn.textContent = '၊၊||၊';
-  }
+  renderActionButtons();
 }
 
 function startWaveform() {
@@ -456,7 +524,43 @@ function drawWaveform(analyserNode) {
 }
 
 sendBtn.addEventListener('click', () => sendTextMessage(promptInput.value));
-clearBtn.addEventListener('click', () => { chatWindow.innerHTML = ''; });
+if (clearBtn) {
+  clearBtn.addEventListener('click', () => {
+    chatWindow.querySelectorAll('.message').forEach((message) => message.remove());
+    syncChatEmptyState();
+  });
+}
+
+if (settingsToggleBtn && settingsDialog) {
+  settingsToggleBtn.addEventListener('click', () => {
+    if (typeof settingsDialog.showModal === 'function' && !settingsDialog.open) {
+      settingsDialog.showModal();
+    }
+  });
+}
+
+if (settingsCloseBtn && settingsDialog) {
+  settingsCloseBtn.addEventListener('click', () => {
+    settingsDialog.close();
+  });
+}
+
+if (settingsDialog) {
+  settingsDialog.addEventListener('click', (event) => {
+    const rect = settingsDialog.getBoundingClientRect();
+    const clickedInDialog = (
+      rect.top <= event.clientY
+      && event.clientY <= rect.top + rect.height
+      && rect.left <= event.clientX
+      && event.clientX <= rect.left + rect.width
+    );
+    if (!clickedInDialog) {
+      settingsDialog.close();
+    }
+  });
+}
+
+promptInput.addEventListener('input', resizePromptInput);
 promptInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
@@ -506,6 +610,9 @@ systemPromptInput.addEventListener('change', () => {
 });
 
 async function init() {
+  renderActionButtons();
+  resizePromptInput();
+  syncChatEmptyState();
   await loadModels();
   await checkHealth();
   setInterval(checkHealth, 15000);

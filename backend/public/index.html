@@ -3,49 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Assistant</title>
+  <title>Rommana</title>
+  <link rel="icon" type="image/webp" href="/icon.webp">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main class="app-shell">
-    <header class="topbar">
-      <h1>AI Assistant</h1>
-      <div class="status-row">
-        <span class="status-item"><span id="llm-dot" class="dot err"></span>LLM</span>
-        <span class="status-item"><span id="stt-dot" class="dot err"></span>STT</span>
-        <span class="status-item"><span id="tts-dot" class="dot err"></span>TTS</span>
+    <header class="rommana-nav">
+      <div class="brand-wrap">
+        <img class="brand-logo" src="/icon.webp" alt="Rommana pomegranate logo">
+        <div class="brand-copy">
+          <h1>Rommana</h1>
+          <p>Minimal AI companion</p>
+        </div>
       </div>
-      <div class="top-controls">
-        <label>
-          Model
-          <select id="model-select"></select>
-        </label>
-        <label class="inline-toggle">
-          <input id="tts-toggle" type="checkbox" checked>
-          Speak responses
-        </label>
+
+      <div class="nav-actions">
+        <div class="status-row" aria-label="System status">
+          <span class="status-item"><span id="llm-dot" class="dot err"></span>LLM</span>
+          <span class="status-item"><span id="stt-dot" class="dot err"></span>STT</span>
+          <span class="status-item"><span id="tts-dot" class="dot err"></span>TTS</span>
+        </div>
+        <button id="settings-toggle" type="button" class="settings-toggle" aria-label="Open settings" title="Settings">⚙</button>
       </div>
     </header>
 
-    <section id="chat-window" class="chat-window"></section>
+    <section class="chat-layout">
+      <article class="panel chat-panel">
+        <section id="chat-window" class="chat-window">
+          <div id="chat-empty-state" class="chat-empty-state">
+            <img src="/icon.webp" alt="" aria-hidden="true">
+            <h2>Rommana</h2>
+            <p>Minimal AI companion</p>
+          </div>
+        </section>
 
-    <section class="voice-bar">
-      <button id="mic-btn" class="mic-btn idle" type="button" aria-label="Record voice">🎤</button>
-      <canvas id="waveform" width="200" height="40"></canvas>
-      <span id="mic-status">Idle</span>
+        <section class="composer-wrap">
+          <section class="composer" aria-label="Chat composer">
+            <textarea id="prompt-input" rows="1" placeholder="Message Rommana..."></textarea>
+            <div class="composer-actions">
+              <button id="mic-btn" class="icon-btn idle" type="button" aria-label="Record voice" title="Record voice"></button>
+              <button id="send-btn" class="icon-btn send" type="button" aria-label="Send message" title="Send message"></button>
+            </div>
+          </section>
+          <section class="composer-meta">
+            <canvas id="waveform" width="220" height="28" aria-hidden="true"></canvas>
+            <span id="mic-status">Idle</span>
+            <button id="clear-btn" type="button" class="text-btn">Clear</button>
+          </section>
+        </section>
+        <p class="composer-copyright">© 2026 Rommana. All rights reserved.</p>
+      </article>
     </section>
 
-    <section class="input-bar">
-      <textarea id="prompt-input" rows="3" placeholder="Type your message"></textarea>
-      <div class="input-actions">
-        <button id="send-btn" type="button">Send</button>
-        <button id="clear-btn" type="button">Clear</button>
+    <dialog id="settings-dialog" class="settings-dialog" aria-label="Advanced settings">
+      <div class="settings-head">
+        <h2>Advanced settings</h2>
+        <button id="settings-close" type="button" class="settings-close" aria-label="Close settings">✕</button>
       </div>
-    </section>
-
-    <details class="settings-panel">
-      <summary>Settings</summary>
       <div class="settings-grid">
+        <label class="full-width">
+          Model
+          <select id="model-select"></select>
+        </label>
+        <label class="inline-toggle full-width">
+          <input id="tts-toggle" type="checkbox" checked>
+          <span>Speak responses</span>
+        </label>
         <label>
           Temperature
           <input id="temperature" type="range" min="0" max="1.0" step="0.1" value="0">
@@ -66,7 +90,7 @@
           <textarea id="system-prompt" rows="3">You are a helpful assistant.</textarea>
         </label>
       </div>
-    </details>
+    </dialog>
   </main>
   <script src="/app.js"></script>
 </body>
