@@ -73,8 +73,7 @@ function parseChatCompletionDelta(frame) {
 function normalizeAsciiToken(token) {
   return String(token || '')
     .replace(/[^\x20-\x7E\n\r\t]/g, '')
-    .replace(/[ \t]+/g, ' ')
-    .trim();
+    .replace(/[ \t]+/g, ' ');
 }
 
 async function chat(req, res, next) {
@@ -275,4 +274,10 @@ module.exports = {
   stream,
   health,
   models,
+  __private: {
+    createSentenceExtractor,
+    parseSseFrames,
+    parseChatCompletionDelta,
+    normalizeAsciiToken,
+  },
 };
