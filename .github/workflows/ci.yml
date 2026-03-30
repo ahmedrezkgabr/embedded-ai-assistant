@@ -140,29 +140,29 @@ jobs:
       - name: Write backend/.env
         run: |
           cat > backend/.env <<EOF
-          PORT=3000
-          TMP_DIR=/tmp
-          UPLOAD_DIR=/tmp/ai-assistant/uploads
-          LOG_FILE=/tmp/ai-assistant/backend.log
-          LLM_BASE_URL=http://127.0.0.1:11434
-          LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
-          LLM_TIMEOUT=60000
-          LLM_MAX_TOKENS=128
-          LLM_TEMPERATURE=0
-          LLM_TOP_P=0.2
-          LLM_FREQUENCY_PENALTY=0
-          LLM_PRESENCE_PENALTY=0
-          LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Keep answers concise and factual.
-          WHISPER_BIN=$PWD/stt/whisper.cpp/build/bin/whisper-cli
-          WHISPER_MODEL=$PWD/stt/models/ggml-tiny.en.bin
-          WHISPER_TIMEOUT=30000
-          PIPER_BIN=$PWD/tts/bin/piper
-          PIPER_VOICE=$PWD/tts/models/en_US-lessac-low.onnx
-          PIPER_VOICE_DIR=$PWD/tts/models
-          PIPER_ESPEAK_DATA=$PWD/tts/bin/espeak-ng-data
-          PIPER_TIMEOUT=20000
-          NODE_ENV=test
-          EOF
+PORT=3000
+TMP_DIR=/tmp
+UPLOAD_DIR=/tmp/ai-assistant/uploads
+LOG_FILE=/tmp/ai-assistant/backend.log
+LLM_BASE_URL=http://127.0.0.1:11434
+LLM_DEFAULT_MODEL=Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
+LLM_TIMEOUT=60000
+LLM_MAX_TOKENS=128
+LLM_TEMPERATURE=0
+LLM_TOP_P=0.2
+LLM_FREQUENCY_PENALTY=0
+LLM_PRESENCE_PENALTY=0
+LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Keep answers concise and factual.
+WHISPER_BIN=$PWD/stt/whisper.cpp/build/bin/whisper-cli
+WHISPER_MODEL=$PWD/stt/models/ggml-tiny.en.bin
+WHISPER_TIMEOUT=30000
+PIPER_BIN=$PWD/tts/bin/piper
+PIPER_VOICE=$PWD/tts/models/en_US-lessac-low.onnx
+PIPER_VOICE_DIR=$PWD/tts/models
+PIPER_ESPEAK_DATA=$PWD/tts/bin/espeak-ng-data
+PIPER_TIMEOUT=20000
+NODE_ENV=test
+EOF
 
       - name: Start llama-server
         run: |
