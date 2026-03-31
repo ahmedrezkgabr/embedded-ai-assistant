@@ -1,22 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
+BASE_URL="${1:-http://localhost:3000}"
+
 echo "Checking LLM health"
-curl -s http://localhost:3000/api/llm/health | cat
+curl -fsS "${BASE_URL}/api/llm/health" | cat
 echo
 
 echo "Checking voice health"
-curl -s http://localhost:3000/api/voice/health | cat
+curl -fsS "${BASE_URL}/api/voice/health" | cat
 echo
 
 echo "Sending test chat"
-curl -s -X POST http://localhost:3000/api/llm/chat \
+curl -fsS -X POST "${BASE_URL}/api/llm/chat" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"say hi"}' | cat
 echo
 
 echo "Sending test TTS"
-curl -s -X POST http://localhost:3000/api/voice/tts \
+curl -fsS -X POST "${BASE_URL}/api/voice/tts" \
   -H "Content-Type: application/json" \
   -d '{"text":"hello"}' > /tmp/test.wav
 

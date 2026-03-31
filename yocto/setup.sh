@@ -4,19 +4,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ ! -d "$ROOT_DIR/poky" ]; then
-  git clone -b scarthgap git://git.yoctoproject.org/poky "$ROOT_DIR/poky"
+  git clone --depth 1 -b scarthgap git://git.yoctoproject.org/poky "$ROOT_DIR/poky"
 else
   echo "poky already present"
 fi
 
 if [ ! -d "$ROOT_DIR/meta-openembedded" ]; then
-  git clone -b scarthgap https://github.com/openembedded/meta-openembedded.git "$ROOT_DIR/meta-openembedded"
+  git clone --depth 1 -b scarthgap https://github.com/openembedded/meta-openembedded.git "$ROOT_DIR/meta-openembedded"
 else
   echo "meta-openembedded already present"
 fi
 
 if [ ! -d "$ROOT_DIR/meta-raspberrypi" ]; then
-  git clone -b scarthgap https://github.com/agherzan/meta-raspberrypi.git "$ROOT_DIR/meta-raspberrypi"
+  git clone --depth 1 -b scarthgap https://github.com/agherzan/meta-raspberrypi.git "$ROOT_DIR/meta-raspberrypi"
 else
   echo "meta-raspberrypi already present"
 fi

@@ -1,6 +1,6 @@
 [Unit]
 Description=AI Assistant Express Backend
-After=network.target llama-server.service
+After=network-online.target llama-server.service
 Wants=llama-server.service
 
 [Service]
@@ -16,6 +16,8 @@ Environment=WHISPER_BIN=/usr/bin/whisper-cli
 Environment=WHISPER_MODEL=/opt/ai-assistant/models/ggml-tiny.en.bin
 Environment=PIPER_BIN=/usr/bin/piper
 Environment=PIPER_VOICE=/opt/ai-assistant/models/en_US-lessac-low.onnx
+Environment=PIPER_PHONEMIZE_BIN=/usr/bin/piper_phonemize
+EnvironmentFile=-/opt/ai-assistant/.env
 
 [Install]
 WantedBy=multi-user.target

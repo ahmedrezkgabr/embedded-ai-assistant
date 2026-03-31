@@ -5,7 +5,7 @@ BBLAYERS ?= " \
   ${TOPDIR}/../meta-openembedded/meta-oe \
   ${TOPDIR}/../meta-openembedded/meta-python \
   ${TOPDIR}/../meta-openembedded/meta-multimedia \
-  ${TOPDIR}/../meta-openembedded/meta-nodejs \
+  ${TOPDIR}/../meta-openembedded/meta-networking \
   ${TOPDIR}/../meta-raspberrypi \
   ${TOPDIR}/../meta-ai-assistant \
 "

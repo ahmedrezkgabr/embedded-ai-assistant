@@ -5,22 +5,25 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=65fc6b420a6f24d1820d6f503f1c915f"
 
 inherit cmake systemd
 
-SRC_URI = "git://github.com/ggerganov/llama.cpp.git;branch=master;protocol=https"
-SRCREV = "ca2f5cc3f545a9ba6feeeaeefe0cb5c7d0d04c10"
+SRC_URI = " \
+    git://github.com/ggerganov/llama.cpp.git;branch=master;protocol=https \
+    file://llama-server.service \
+"
+SRCREV = "08f21453aec846867b39878500d725a05bd32683"
 
 S = "${WORKDIR}/git"
 
 EXTRA_OECMAKE = "-DLLAMA_BUILD_SERVER=ON -DLLAMA_NATIVE=OFF -DLLAMA_BUILD_TESTS=OFF"
+
+RDEPENDS:${PN} += "libstdc++"
 
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${B}/bin/llama-server ${D}${bindir}/llama-server
 
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${WORKDIR}/llama-server.service ${D}${systemd_system_unitdir}/llama-server.service
+    install -m 0644 ${UNPACKDIR}/llama-server.service ${D}${systemd_system_unitdir}/llama-server.service
 }
-
-SRC_URI += "file://llama-server.service"
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "llama-server.service"
