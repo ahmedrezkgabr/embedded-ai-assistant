@@ -218,6 +218,10 @@ async function sendTextMessage(text, options = {}) {
 }
 
 function chooseMimeType() {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return '';
+  }
+
   const candidates = [
     'audio/webm;codecs=opus',
     'audio/webm',
@@ -232,12 +236,48 @@ function chooseMimeType() {
   return '';
 }
 
+function microphoneSupportMessage() {
+  if (!window.isSecureContext) {
+    return 'Microphone API unavailable in this context. Use HTTPS or http://localhost.';
+  }
+  return 'Microphone API is not supported by this browser.';
+}
+
+function getLegacyGetUserMedia() {
+  return (
+    navigator.getUserMedia
+    || navigator.webkitGetUserMedia
+    || navigator.mozGetUserMedia
+    || navigator.msGetUserMedia
+    || null
+  );
+}
+
+async function requestMicrophoneStream() {
+  if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+
+  const legacyGetUserMedia = getLegacyGetUserMedia();
+  if (legacyGetUserMedia) {
+    return new Promise((resolve, reject) => {
+      legacyGetUserMedia.call(navigator, { audio: true }, resolve, reject);
+    });
+  }
+
+  throw new Error(microphoneSupportMessage());
+}
+
 async function startRecording() {
   if (state.isRecording) {
     return;
   }
 
-  state.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  if (typeof MediaRecorder === 'undefined') {
+    throw new Error('MediaRecorder is not supported by this browser.');
+  }
+
+  state.audioStream = await requestMicrophoneStream();
   state.recordedChunks = [];
 
   const mimeType = chooseMimeType();
