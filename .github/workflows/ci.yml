@@ -265,6 +265,11 @@ jobs:
             python3-git python3-jinja2 python3-subunit zstd liblz4-tool file locales
           sudo locale-gen en_US.UTF-8
 
+      - name: Enable unprivileged user namespaces for BitBake
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sysctl kernel.apparmor_restrict_unprivileged_userns
+
       - name: Prepare backend dependencies for Yocto packaging
         run: |
           cd backend
