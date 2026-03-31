@@ -138,7 +138,8 @@ jobs:
 
       - name: Write backend/.env
         run: |
-          cat > backend/.env <<'EOF'
+          REPO_ROOT="$PWD"
+          cat > backend/.env <<EOF
           PORT=3000
           TMP_DIR=/tmp
           UPLOAD_DIR=/tmp/ai-assistant/uploads
@@ -152,18 +153,19 @@ jobs:
           LLM_FREQUENCY_PENALTY=0
           LLM_PRESENCE_PENALTY=0
           LLM_STRICT_SYSTEM_PROMPT=You are an embedded Linux voice assistant running offline. Always reply in English only using ASCII characters. Keep answers concise and factual.
-          WHISPER_BIN=$PWD/stt/whisper.cpp/build/bin/whisper-cli
-          WHISPER_MODEL=$PWD/stt/models/ggml-tiny.en.bin
+          WHISPER_BIN=$REPO_ROOT/stt/whisper.cpp/build/bin/whisper-cli
+          WHISPER_MODEL=$REPO_ROOT/stt/models/ggml-tiny.en.bin
           WHISPER_TIMEOUT=30000
-          PIPER_BIN=$PWD/tts/bin/piper
-          PIPER_VOICE=$PWD/tts/models/en_US-lessac-low.onnx
-          PIPER_VOICE_DIR=$PWD/tts/models
-          PIPER_ESPEAK_DATA=$PWD/tts/bin/espeak-ng-data
-          LD_LIBRARY_PATH=$PWD/tts/bin
+          PIPER_BIN=$REPO_ROOT/tts/bin/piper
+          PIPER_VOICE=$REPO_ROOT/tts/models/en_US-lessac-low.onnx
+          PIPER_VOICE_DIR=$REPO_ROOT/tts/models
+          PIPER_ESPEAK_DATA=$REPO_ROOT/tts/bin/espeak-ng-data
+          LD_LIBRARY_PATH=$REPO_ROOT/tts/bin
           PIPER_TIMEOUT=20000
           NODE_ENV=test
           EOF
           sed -i 's/^[[:space:]]*//' backend/.env
+          ! grep -q '\$PWD' backend/.env
 
       - name: Start llama-server
         run: |
