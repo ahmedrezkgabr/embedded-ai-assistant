@@ -1,20 +1,72 @@
+# Node.js
 node_modules/
-*.log
+npm-debug.log*
+.npm/
 .env
+.env.local
+.env.*.local
+
+# Build outputs
 build/
-tmp/
-yocto/build/
-yocto/downloads/
-yocto/sstate-cache/
+dist/
+*.o
+*.a
+*.so
+*.so.*
+
+# AI models (large binary files — download via setup.sh)
 *.gguf
 *.ggml
 *.onnx
+*.bin
 models/
-whisper.cpp/
-llama.cpp/
-piper/
+
+# Yocto build artifacts
+yocto/build/
+yocto/build-rpi5/
+yocto/downloads/
+yocto/sstate-cache/
+yocto/poky/
+yocto/meta-openembedded/
+yocto/meta-nodejs/
+yocto/meta-raspberrypi/
+
+# llama.cpp source (cloned by setup.sh)
+llm/llama.cpp/
+
+# whisper.cpp source (cloned by setup.sh)
+stt/whisper.cpp/
+
+# piper source and binary (downloaded by setup.sh)
+tts/piper-src/
+tts/bin/
+
+# Test and temp files
+/tmp/ai-assistant-logs/
 *.wav
 *.mp3
 *.pcm
-tts/bin
-plan.md
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Python environments
+.venv/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+logs/

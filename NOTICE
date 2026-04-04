@@ -1,0 +1,45 @@
+# NOTICE
+
+Embedded AI Assistant
+Copyright 2024 Ahmed Rezk
+
+This product includes software developed by:
+
+## llama.cpp
+Copyright (c) 2023 Georgi Gerganov
+License: MIT
+https://github.com/ggerganov/llama.cpp
+
+## whisper.cpp
+Copyright (c) 2023 Georgi Gerganov
+License: MIT
+https://github.com/ggerganov/whisper.cpp
+
+## Piper TTS
+Copyright (c) 2023 Rhasspy
+License: MIT
+https://github.com/rhasspy/piper
+
+## Qwen2.5 Model
+Copyright (c) 2024 Alibaba Cloud
+License: Apache 2.0
+https://huggingface.co/Qwen
+
+## Express.js
+Copyright (c) 2009-2014 TJ Holowaychuk
+Copyright (c) 2013-2014 Roman Shtylman
+Copyright (c) 2014-2015 Douglas Christopher Wilson
+License: MIT
+https://github.com/expressjs/express
+
+## Linux Kernel (embedded image)
+License: GPL v2
+Source available at: [link to kernel source]
+Note: The Linux kernel is distributed under GPLv2.
+Kernel source code is available upon request as
+required by the GPLv2 license.
+
+## Yocto Project / Poky
+Copyright (c) Linux Foundation
+License: MIT (build system), component licenses vary
+https://www.yoctoproject.org

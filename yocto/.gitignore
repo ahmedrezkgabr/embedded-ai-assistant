@@ -1,0 +1,8 @@
+build/
+build-rpi5/
+downloads/
+sstate-cache/
+poky/
+meta-openembedded/
+meta-nodejs/
+meta-raspberrypi/

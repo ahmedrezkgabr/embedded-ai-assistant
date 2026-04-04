@@ -1,0 +1,41 @@
+# Force LF line endings for all text files
+* text=auto eol=lf
+
+# Shell scripts must have LF (CRLF breaks bash)
+*.sh text eol=lf
+
+# BitBake recipes must have LF
+*.bb text eol=lf
+*.bbappend text eol=lf
+*.conf text eol=lf
+*.inc text eol=lf
+
+# JavaScript and JSON
+*.js text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+
+# HTML/CSS
+*.html text eol=lf
+*.css text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# YAML
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary files (never diff or merge)
+*.gguf binary
+*.ggml binary
+*.onnx binary
+*.bin binary
+*.wav binary
+*.png binary
+*.jpg binary
+
+# Linguist (GitHub language detection)
+yocto/meta-ai-assistant/**/*.bb linguist-language=BitBake
+yocto/meta-ai-assistant/**/*.bbappend linguist-language=BitBake
+yocto/meta-ai-assistant/**/*.conf linguist-language=BitBake
