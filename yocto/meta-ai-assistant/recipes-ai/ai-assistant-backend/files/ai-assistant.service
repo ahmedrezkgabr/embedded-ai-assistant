@@ -9,6 +9,8 @@ WorkingDirectory=/opt/ai-assistant/backend
 ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=LLM_BASE_URL=http://localhost:11434

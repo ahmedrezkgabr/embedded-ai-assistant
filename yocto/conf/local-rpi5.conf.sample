@@ -2,8 +2,15 @@ MACHINE = "raspberrypi5"
 DISTRO = "poky"
 ENABLE_UART = "1"
 DISABLE_SPLASH = "1"
+KERNEL_DEVICETREE = "broadcom/bcm2712-rpi-5-b.dtb"
+RPI_USE_U_BOOT = "0"
+DEFAULTTUNE ?= "cortexa76"
 PACKAGE_CLASSES ?= "package_ipk"
 IMAGE_ROOTFS_EXTRA_SPACE = "4194304"
 
 # ALSA audio support for USB microphones and speakers
 MACHINE_FEATURES:append = " alsa"
+
+DISTRO_FEATURES:append = " systemd"
+VIRTUAL-RUNTIME_init_manager = "systemd"
+DISTRO_FEATURES_BACKFILL_CONSIDERED:append = " sysvinit"

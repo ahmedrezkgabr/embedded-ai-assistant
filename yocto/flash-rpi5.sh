@@ -3,16 +3,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IMAGE_DIR="${SCRIPT_DIR}/build/tmp/deploy/images/raspberrypi5"
-IMAGE="${IMAGE_DIR}/ai-assistant-image-raspberrypi5.rootfs.wic.bz2"
-
-if [ ! -f "$IMAGE" ]; then
-  IMAGE="${IMAGE_DIR}/ai-assistant-image-raspberrypi5.wic.bz2"
-fi
+IMAGE="$(ls -1t ${IMAGE_DIR}/ai-assistant-image-raspberrypi5*.wic.bz2 2>/dev/null | head -n 1 || true)"
 
 DEVICE="${1:-}"
 
 if [ -z "$DEVICE" ]; then
   echo "Usage: $0 /dev/sdX"
+  exit 1
+fi
+
+if [ ! -b "$DEVICE" ]; then
+  echo "ERROR: $DEVICE is not a block device"
   exit 1
 fi
 

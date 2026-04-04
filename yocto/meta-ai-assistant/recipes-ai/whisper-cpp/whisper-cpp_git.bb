@@ -10,6 +10,16 @@ SRCREV = "95ea8f9bfb03a15db08a8989966fd1ae3361e20d"
 
 S = "${WORKDIR}/git"
 
+DEPENDS += "zlib"
+
+EXTRA_OECMAKE = " \
+    -DWHISPER_BUILD_TESTS=OFF \
+    -DWHISPER_BUILD_EXAMPLES=OFF \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DWHISPER_NATIVE=OFF \
+    -DGGML_NATIVE=OFF \
+"
+
 RDEPENDS:${PN} += "libstdc++"
 
 do_install() {

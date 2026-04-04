@@ -3,3 +3,7 @@ DISTRO = "poky"
 EXTRA_IMAGE_FEATURES += "debug-tweaks"
 PACKAGE_CLASSES ?= "package_ipk"
 IMAGE_ROOTFS_EXTRA_SPACE = "4194304"
+
+DISTRO_FEATURES:append = " systemd"
+VIRTUAL-RUNTIME_init_manager = "systemd"
+DISTRO_FEATURES_BACKFILL_CONSIDERED:append = " sysvinit"

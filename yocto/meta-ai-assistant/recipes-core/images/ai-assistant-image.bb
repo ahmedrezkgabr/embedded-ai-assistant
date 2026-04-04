@@ -10,12 +10,15 @@ IMAGE_INSTALL:append = " \
   llama-cpp \
   whisper-cpp \
   piper-tts \
+  espeak-ng \
+  espeak-ng-data \
   alsa-utils \
   alsa-lib \
   ai-assistant-backend \
   curl \
   bash \
-  htop \
+  ca-certificates \
+  tzdata \
 "
 
 IMAGE_ROOTFS_EXTRA_SPACE = "4194304"

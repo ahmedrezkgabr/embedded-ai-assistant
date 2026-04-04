@@ -2,12 +2,15 @@
 Description=llama.cpp server for embedded AI assistant
 After=network-online.target
 Wants=network-online.target
+Before=ai-assistant.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/llama-server -m /opt/ai-assistant/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf --host 0.0.0.0 --port 11434 -c 2048 --threads 2 -ngl 0 --chat-template chatml
+ExecStart=/usr/bin/llama-server -m /opt/ai-assistant/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf --host 0.0.0.0 --port 11434 -c 2048 --threads 2 -ngl 0 --chat-template qwen2
 Restart=on-failure
-RestartSec=3
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
